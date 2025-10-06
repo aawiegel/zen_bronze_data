@@ -1,0 +1,31 @@
+# This is a Databricks asset bundle definition for flexible-data-processing.
+# The Databricks extension requires databricks.yml configuration file.
+# See https://docs.databricks.com/dev-tools/bundles/index.html for documentation.
+
+bundle:
+  name: flexible-data-processing
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: https://dbc-81f4a118-bb2c.cloud.databricks.com
+
+resources:
+  schemas:
+    bronze_schema:
+      name: bronze
+      catalog_name: workspace
+      comment: "Bronze layer schema for raw data"
+    
+    silver_schema:
+      name: silver
+      catalog_name: workspace
+      comment: "Silver layer schema for cleaned data"
+  
+  volumes:
+    incoming:
+      catalog_name: workspace
+      name: incoming
+      schema_name: bronze

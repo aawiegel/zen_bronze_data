@@ -47,17 +47,17 @@ def test_forge_distribution_with_all_parameters(np_number_generator):
     result = numeric.forge_distribution(
         np_number_generator,
         size=20,
-        distribution='gamma',
+        distribution="gamma",
         shape=2.0,
         scale=0.5,
         min_value=0.5,
         max_value=3.0,
-        precision=4
+        precision=4,
     )
-    
+
     assert len(result) == 20
-    assert result.dtype.kind == 'U'
-    
+    assert result.dtype.kind == "U"
+
     float_values = result.astype(float)
     assert float_values.min() >= 0.5
     assert float_values.max() <= 3.0

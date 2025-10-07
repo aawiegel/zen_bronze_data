@@ -32,11 +32,10 @@ def forge_date_pairs(
     processing_days = np.maximum(1, np.random.poisson(processing_lambda, size=size))
 
     base = np.datetime64(start_date)
-    received_dates = base + random_days.astype('timedelta64[D]')
-    processed_dates = received_dates + processing_days.astype('timedelta64[D]')
+    received_dates = base + random_days.astype("timedelta64[D]")
+    processed_dates = received_dates + processing_days.astype("timedelta64[D]")
 
-    received_strs = np.datetime_as_string(received_dates, unit='D')
-    processed_strs = np.datetime_as_string(processed_dates, unit='D')
+    received_strs = np.datetime_as_string(received_dates, unit="D")
+    processed_strs = np.datetime_as_string(processed_dates, unit="D")
 
     return received_strs, processed_strs
-

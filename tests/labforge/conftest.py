@@ -1,6 +1,7 @@
 import pytest
 import numpy as np
 
+
 @pytest.fixture
-def fixed_numpy_seed():
-    np.random.seed(42)
+def np_number_generator():
+    return np.random.default_rng(seed=42)

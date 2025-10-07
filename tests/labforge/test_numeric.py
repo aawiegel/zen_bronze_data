@@ -1,3 +1,5 @@
+import numpy as np
+import pytest
 from src.labforge import numeric
 
 
@@ -61,3 +63,101 @@ def test_forge_distribution_with_all_parameters(np_number_generator):
     float_values = result.astype(float)
     assert float_values.min() >= 0.5
     assert float_values.max() <= 3.0
+
+
+def test_forge_distribution_null_probability_basic(np_number_generator):
+    """Test that null_probability generates expected proportion of nulls"""
+    result = numeric.forge_distribution(
+        np_number_generator,
+        size=1000,
+        distribution="normal",
+        loc=5.0,
+        scale=1.0,
+        null_probability=0.3,
+    )
+
+    # Should be float array with NaN values
+    assert result.dtype.kind == "f"
+    null_count = np.isnan(result).sum()
+    # With 1000 samples and p=0.3, expect roughly 300 nulls (allow 20-40% range)
+    assert 200 <= null_count <= 400
+
+
+def test_forge_distribution_null_probability_with_precision(np_number_generator):
+    """Test that nulls become empty strings when precision is set"""
+    result = numeric.forge_distribution(
+        np_number_generator,
+        size=100,
+        distribution="uniform",
+        low=0.0,
+        high=10.0,
+        null_probability=0.5,
+        precision=3,
+    )
+
+    # Should be string array
+    assert result.dtype.kind == "U"
+    # Empty strings represent nulls
+    empty_count = (result == "").sum()
+    # With 100 samples and p=0.5, expect roughly 50 empty strings (allow 30-70% range)
+    assert 30 <= empty_count <= 70
+
+
+def test_forge_distribution_null_probability_zero(np_number_generator):
+    """Test that null_probability=0.0 generates no nulls"""
+    result = numeric.forge_distribution(
+        np_number_generator,
+        size=100,
+        distribution="normal",
+        loc=5.0,
+        scale=1.0,
+        null_probability=0.0,
+    )
+
+    assert not np.isnan(result).any()
+
+
+def test_forge_distribution_null_probability_one(np_number_generator):
+    """Test that null_probability=1.0 generates all nulls"""
+    result = numeric.forge_distribution(
+        np_number_generator,
+        size=50,
+        distribution="normal",
+        loc=5.0,
+        scale=1.0,
+        null_probability=1.0,
+    )
+
+    assert np.isnan(result).all()
+
+
+def test_forge_distribution_invalid_null_probability_high(np_number_generator):
+    """Test that null_probability > 1.0 raises ValueError"""
+    with pytest.raises(ValueError, match="null_probability must be between 0 and 1"):
+        numeric.forge_distribution(
+            np_number_generator,
+            size=10,
+            distribution="normal",
+            null_probability=1.5,
+        )
+
+
+def test_forge_distribution_invalid_null_probability_negative(np_number_generator):
+    """Test that null_probability < 0.0 raises ValueError"""
+    with pytest.raises(ValueError, match="null_probability must be between 0 and 1"):
+        numeric.forge_distribution(
+            np_number_generator,
+            size=10,
+            distribution="normal",
+            null_probability=-0.1,
+        )
+
+
+def test_forge_distribution_invalid_distribution(np_number_generator):
+    """Test that invalid distribution name raises ValueError"""
+    with pytest.raises(ValueError, match="Unknown distribution"):
+        numeric.forge_distribution(
+            np_number_generator,
+            size=10,
+            distribution="invalid_dist",
+        )

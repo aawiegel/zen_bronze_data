@@ -24,7 +24,7 @@ def forge_date_pairs(
     np.ndarray, np.ndarray : Arrays of date strings pairs
     """
     start_date = datetime(year, 1, 1)
-    end_date = datetime(year, 1, 1)
+    end_date = datetime(year + 1, 1, 1)
     days_in_year = (end_date - start_date).days
 
     random_days = generator.integers(0, days_in_year + 1, size=size)

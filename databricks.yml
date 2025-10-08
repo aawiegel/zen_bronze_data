@@ -18,14 +18,27 @@ resources:
       name: bronze
       catalog_name: workspace
       comment: "Bronze layer schema for raw data"
-    
+
     silver_schema:
       name: silver
       catalog_name: workspace
       comment: "Silver layer schema for cleaned data"
-  
+
   volumes:
     incoming:
       catalog_name: workspace
       name: incoming
       schema_name: bronze
+
+  jobs:
+    generate_sample_files:
+      name: "Generate Sample CSV Files"
+      tasks:
+        - task_key: generate_files
+          notebook_task:
+            notebook_path: ./notebooks/generate_sample_files.py
+            source: WORKSPACE
+            base_parameters:
+              catalog: workspace
+              bronze_schema: ${resources.schemas.bronze_schema.name}
+              incoming_volume: ${resources.volumes.incoming.name}

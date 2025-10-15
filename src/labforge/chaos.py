@@ -20,10 +20,6 @@ COMMON_TYPOS = {
     "matter": "mattr",
 }
 
-# Invalid database column characters that humans might use
-# These are problematic in SQL identifiers but common in spreadsheets
-INVALID_DB_CHARS = ["#", "%", "-"]
-
 
 def chaos_header_typos(
     generator, df: pd.DataFrame, probability: float = 0.3

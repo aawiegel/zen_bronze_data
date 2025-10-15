@@ -28,7 +28,7 @@ if workspace_files_path not in sys.path:
     sys.path.insert(0, workspace_files_path)
 
 import numpy as np
-from src.labforge import vendors, chaos
+from src.labforge import vendors, chaos, metadata
 
 # Initialize random generator for reproducibility
 gen = np.random.default_rng(42)
@@ -46,10 +46,12 @@ gen = np.random.default_rng(42)
 # Default values are for local/manual runs
 dbutils.widgets.text("catalog", "workspace", "Catalog Name")
 dbutils.widgets.text("bronze_schema", "bronze", "Bronze Schema Name")
+dbutils.widgets.text("silver_schema", "silver", "Silver Schema Name")
 dbutils.widgets.text("incoming_volume", "incoming", "Incoming Volume Name")
 
 catalog = dbutils.widgets.get("catalog")
 bronze_schema = dbutils.widgets.get("bronze_schema")
+silver_schema = dbutils.widgets.get("silver_schema")
 incoming_volume = dbutils.widgets.get("incoming_volume")
 
 # Construct volume path
@@ -189,7 +191,27 @@ files_to_generate = [
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Generate and Write Files
+# MAGIC ## Generate Metadata Tables
+
+# COMMAND ----------
+
+print("Generating metadata tables...")
+
+# Generate analyte dimension table
+analyte_dim_path = f"{VOLUME_PATH}/analyte_dimension.csv"
+metadata.generate_analyte_dimension_csv(analyte_dim_path)
+print(f"  ✓ Analyte dimension written to {analyte_dim_path}")
+
+# Generate vendor-analyte mapping table
+mapping_path = f"{VOLUME_PATH}/vendor_analyte_mapping.csv"
+metadata.generate_vendor_analyte_mapping_csv(mapping_path)
+print(f"  ✓ Vendor-analyte mapping written to {mapping_path}")
+print()
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Generate and Write Vendor Files
 
 # COMMAND ----------
 
@@ -227,9 +249,36 @@ for file_config in files_to_generate:
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC ## Load Metadata Tables to Delta
+
+# COMMAND ----------
+
+print("Loading metadata tables to Delta...")
+
+# Load analyte dimension to silver (clean reference data)
+analyte_df = spark.read.option("header", "true").option("inferSchema", "true").csv(
+    analyte_dim_path
+)
+analyte_table_name = f"{catalog}.{silver_schema}.analyte_dimension"
+analyte_df.write.mode("overwrite").saveAsTable(analyte_table_name)
+print(f"  ✓ Analyte dimension saved to {analyte_table_name}")
+
+# Load vendor-analyte mapping to bronze (raw mapping data)
+mapping_df = spark.read.option("header", "true").option("inferSchema", "true").csv(
+    mapping_path
+)
+mapping_table_name = f"{catalog}.{bronze_schema}.vendor_analyte_mapping"
+mapping_df.write.mode("overwrite").saveAsTable(mapping_table_name)
+print(f"  ✓ Vendor-analyte mapping saved to {mapping_table_name}")
+print()
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ## Summary
 # MAGIC
 # MAGIC Files generated successfully! You should now have:
+# MAGIC - **Metadata tables** (analyte_dimension.csv, vendor_analyte_mapping.csv)
 # MAGIC - **Clean files** showing legitimate vendor schema variations
 # MAGIC - **Messy files** with header typos, casing issues, whitespace
 # MAGIC - **Excel nightmares** with unnamed columns

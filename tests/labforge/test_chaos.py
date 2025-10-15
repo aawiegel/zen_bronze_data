@@ -227,3 +227,121 @@ def test_apply_chaos_with_unnamed_columns(np_number_generator):
     # Check for unnamed columns
     has_unnamed = any("Unnamed:" in str(col) for col in df_chaos.columns)
     assert has_unnamed
+
+
+def test_chaos_invalid_db_chars_id_columns(np_number_generator):
+    """Test that # is added to ID columns"""
+    df = pd.DataFrame(
+        {
+            "sample_id": [1, 2, 3],
+            "lab_id": [4, 5, 6],
+            "barcode": [7, 8, 9],
+        }
+    )
+
+    df_chaos = chaos.chaos_invalid_db_chars(np_number_generator, df, probability=1.0)
+
+    # ID columns should get # prefix
+    assert "#sample_id" in df_chaos.columns or "#lab_id" in df_chaos.columns
+
+
+def test_chaos_invalid_db_chars_id_edge_case(np_number_generator):
+    """Test that # is NOT added to columns that contain 'id' but aren't ID columns"""
+    df = pd.DataFrame(
+        {
+            "acidity": [5.5, 6.0, 6.5],
+            "humidity": [45.0, 50.0, 55.0],
+            "sample_id": [1, 2, 3],
+        }
+    )
+
+    df_chaos = chaos.chaos_invalid_db_chars(np_number_generator, df, probability=1.0)
+
+    # acidity and humidity should NOT get # prefix (they contain "id" but aren't ID columns)
+    assert not any(
+        col.startswith("#") and "acidity" in col.lower() for col in df_chaos.columns
+    )
+    assert not any(
+        col.startswith("#") and "humidity" in col.lower() for col in df_chaos.columns
+    )
+
+    # sample_id SHOULD get # prefix (ends with _id)
+    assert "#sample_id" in df_chaos.columns
+
+
+def test_chaos_invalid_db_chars_percentage_columns(np_number_generator):
+    """Test that % suffix is added to percentage columns"""
+    df = pd.DataFrame(
+        {
+            "organic_matter_pct": [1.5, 2.0, 3.0],
+            "moisture_percent": [10, 15, 20],
+            "copper_ppm": [5, 6, 7],
+        }
+    )
+
+    df_chaos = chaos.chaos_invalid_db_chars(np_number_generator, df, probability=1.0)
+
+    # Percentage columns should get % suffix
+    assert "organic_matter%" in df_chaos.columns or "moisture%" in df_chaos.columns
+    # Non-percentage columns should not get %
+    assert "copper_ppm%" not in df_chaos.columns
+
+
+def test_chaos_invalid_db_chars_hyphens(np_number_generator):
+    """Test that underscores are replaced with hyphens"""
+    df = pd.DataFrame(
+        {
+            "sample_barcode": [1, 2, 3],
+            "test_value": [4, 5, 6],
+        }
+    )
+
+    df_chaos = chaos.chaos_invalid_db_chars(np_number_generator, df, probability=1.0)
+
+    # Some columns should have hyphens instead of underscores
+    has_hyphens = any("-" in str(col) for col in df_chaos.columns)
+    assert has_hyphens
+
+
+def test_chaos_invalid_db_chars_preserves_data(np_number_generator):
+    """Test that invalid chars don't affect data values"""
+    df = pd.DataFrame(
+        {
+            "sample_id": [1, 2, 3],
+            "organic_matter_pct": [1.5, 2.0, 3.0],
+        }
+    )
+
+    df_chaos = chaos.chaos_invalid_db_chars(np_number_generator, df, probability=1.0)
+
+    # Data should be preserved
+    assert len(df_chaos) == 3
+    # Check first column data (whatever it's named now)
+    assert df_chaos.iloc[:, 0].tolist() == [1, 2, 3]
+
+
+def test_apply_chaos_with_invalid_db_chars(np_number_generator):
+    """Test that apply_chaos can add invalid database characters"""
+    df = pd.DataFrame(
+        {
+            "sample_id": [1, 2, 3],
+            "organic_matter_pct": [4.5, 5.5, 6.5],
+        }
+    )
+
+    df_chaos = chaos.apply_chaos(
+        np_number_generator,
+        df,
+        header_typos=0.0,
+        header_casing=0.0,
+        header_whitespace=0.0,
+        invalid_db_chars=1.0,
+    )
+
+    # Should have invalid chars in column names
+    has_hash = any("#" in str(col) for col in df_chaos.columns)
+    has_percent = any("%" in str(col) for col in df_chaos.columns)
+    has_hyphen = any("-" in str(col) for col in df_chaos.columns)
+
+    # At least one type of invalid char should be present
+    assert has_hash or has_percent or has_hyphen

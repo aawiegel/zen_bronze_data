@@ -170,6 +170,20 @@ files_to_generate = [
             "num_unnamed": 5,
         },
     },
+    {
+        "filename": "vendor_b_standard_db_nightmare.csv",
+        "vendor": "vendor_b",
+        "packages": ["standard"],
+        "rows": 50,
+        "add_chaos": True,
+        "chaos_config": {
+            "header_typos": 0.0,
+            "header_casing": 0.0,
+            "header_whitespace": 0.0,
+            "invalid_db_chars": 1.0,
+            "add_unnamed_columns": False,
+        },
+    },
 ]
 
 # COMMAND ----------
@@ -219,6 +233,7 @@ for file_config in files_to_generate:
 # MAGIC - **Clean files** showing legitimate vendor schema variations
 # MAGIC - **Messy files** with header typos, casing issues, whitespace
 # MAGIC - **Excel nightmares** with unnamed columns
+# MAGIC - **Database nightmares** with invalid column name characters (#, %, -)
 # MAGIC
 # MAGIC These files are ready to be processed by your bronze → silver transformation logic!
 

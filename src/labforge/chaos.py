@@ -20,6 +20,10 @@ COMMON_TYPOS = {
     "matter": "mattr",
 }
 
+# Invalid database column characters that humans might use
+# These are problematic in SQL identifiers but common in spreadsheets
+INVALID_DB_CHARS = ["#", "%", "-"]
+
 
 def chaos_header_typos(
     generator, df: pd.DataFrame, probability: float = 0.3
@@ -123,6 +127,54 @@ def chaos_header_whitespace(
     return df
 
 
+def chaos_invalid_db_chars(
+    generator, df: pd.DataFrame, probability: float = 0.3
+) -> pd.DataFrame:
+    """
+    Add invalid database characters to column names
+
+    Simulates common spreadsheet practices:
+    - # prefix for ID columns (e.g., "id" → "#id")
+    - % suffix for percentage columns (e.g., "organic_matter_pct" → "organic_matter%")
+    - Hyphens replacing underscores (e.g., "sample_id" → "sample-id")
+
+    Args:
+        generator: numpy random generator
+        df: Input DataFrame
+        probability: Probability of modifying each column
+
+    Returns:
+        DataFrame with database-unfriendly column names
+
+    Example:
+        >>> gen = np.random.default_rng(42)
+        >>> df = pd.DataFrame({"sample_id": [1, 2], "cu_pct": [5.2, 6.1]})
+        >>> df_chaos = chaos_invalid_db_chars(gen, df, probability=0.8)
+        >>> # Might produce: "sample-id", "cu%"
+    """
+    new_columns = []
+    for col in df.columns:
+        if generator.random() < probability:
+            new_col = col
+
+            # # prefix for id columns
+            if "id" in col.lower() and not col.startswith("#"):
+                new_col = "#" + new_col
+            # % suffix for percentage/pct columns
+            elif "pct" in col.lower() or "percent" in col.lower():
+                new_col = new_col.replace("_pct", "%").replace("_percent", "%")
+            # Replace underscores with hyphens
+            elif "_" in new_col:
+                new_col = new_col.replace("_", "-")
+
+            new_columns.append(new_col)
+        else:
+            new_columns.append(col)
+
+    df.columns = new_columns
+    return df
+
+
 def chaos_unnamed_columns(
     generator, df: pd.DataFrame, num_columns: int = None
 ) -> pd.DataFrame:
@@ -161,6 +213,7 @@ def apply_chaos(
     header_typos: float = 0.3,
     header_casing: float = 0.4,
     header_whitespace: float = 0.2,
+    invalid_db_chars: float = 0.0,
     add_unnamed_columns: bool = False,
     num_unnamed: int = None,
 ) -> pd.DataFrame:
@@ -173,6 +226,7 @@ def apply_chaos(
         header_typos: Probability of header typos (0.0 to 1.0)
         header_casing: Probability of header casing changes (0.0 to 1.0)
         header_whitespace: Probability of header whitespace (0.0 to 1.0)
+        invalid_db_chars: Probability of invalid database characters (0.0 to 1.0)
         add_unnamed_columns: If True, add "Unnamed: N" columns
         num_unnamed: Number of unnamed columns to add (if None and add_unnamed_columns=True, random 1-5)
 
@@ -193,6 +247,8 @@ def apply_chaos(
         df = chaos_header_casing(generator, df, probability=header_casing)
     if header_whitespace > 0:
         df = chaos_header_whitespace(generator, df, probability=header_whitespace)
+    if invalid_db_chars > 0:
+        df = chaos_invalid_db_chars(generator, df, probability=invalid_db_chars)
     if add_unnamed_columns:
         df = chaos_unnamed_columns(generator, df, num_columns=num_unnamed)
 

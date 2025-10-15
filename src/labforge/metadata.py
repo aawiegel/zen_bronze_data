@@ -328,3 +328,30 @@ def generate_vendor_analyte_mapping_csv(output_path: str) -> pd.DataFrame:
     df = pd.DataFrame(VENDOR_ANALYTE_MAPPING)
     df.to_csv(output_path, index=False)
     return df
+
+
+# Simple dict mapping for quick lookups: (vendor_id, vendor_column_name) -> analyte_name
+VENDOR_COLUMN_TO_ANALYTE = {
+    # Vendor A
+    ("vendor_a", "ph"): "ph",
+    ("vendor_a", "copper_ppm"): "copper",
+    ("vendor_a", "zinc_ppm"): "zinc",
+    ("vendor_a", "lead_ppm"): "lead",
+    ("vendor_a", "iron_ppm"): "iron",
+    ("vendor_a", "manganese_ppm"): "manganese",
+    ("vendor_a", "boron_ppm"): "boron",
+    ("vendor_a", "molybdenum_ppm"): "molybdenum",
+    ("vendor_a", "sulfur_ppm"): "sulfur",
+    ("vendor_a", "organic_matter_pct"): "organic_matter",
+    # Vendor B
+    ("vendor_b", "acidity"): "ph",
+    ("vendor_b", "cu_total"): "copper",
+    ("vendor_b", "zn_total"): "zinc",
+    ("vendor_b", "pb_total"): "lead",
+    ("vendor_b", "fe_total"): "iron",
+    ("vendor_b", "mn_total"): "manganese",
+    ("vendor_b", "b_total"): "boron",
+    ("vendor_b", "mo_total"): "molybdenum",
+    ("vendor_b", "ec_ms_cm"): "electrical_conductivity",
+    ("vendor_b", "organic_carbon_pct"): "organic_matter",
+}

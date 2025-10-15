@@ -136,3 +136,27 @@ def test_mapping_surrogate_key_uniqueness():
         m["vendor_analyte_mapping_id"] for m in metadata.VENDOR_ANALYTE_MAPPING
     ]
     assert len(mapping_ids) == len(set(mapping_ids))
+
+
+def test_vendor_column_to_analyte_dict():
+    """Test the simple dict mapping"""
+    # Test vendor A mapping
+    assert metadata.VENDOR_COLUMN_TO_ANALYTE[("vendor_a", "ph")] == "ph"
+    assert metadata.VENDOR_COLUMN_TO_ANALYTE[("vendor_a", "copper_ppm")] == "copper"
+
+    # Test vendor B mapping (different column names, same analytes)
+    assert metadata.VENDOR_COLUMN_TO_ANALYTE[("vendor_b", "acidity")] == "ph"
+    assert metadata.VENDOR_COLUMN_TO_ANALYTE[("vendor_b", "cu_total")] == "copper"
+
+    # Test that both vendors map to same analyte
+    assert (
+        metadata.VENDOR_COLUMN_TO_ANALYTE[("vendor_a", "ph")]
+        == metadata.VENDOR_COLUMN_TO_ANALYTE[("vendor_b", "acidity")]
+    )
+
+
+def test_vendor_column_to_analyte_completeness():
+    """Test that dict has all mappings from the table"""
+    assert len(metadata.VENDOR_COLUMN_TO_ANALYTE) == len(
+        metadata.VENDOR_ANALYTE_MAPPING
+    )

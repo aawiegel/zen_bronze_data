@@ -41,4 +41,5 @@ resources:
             base_parameters:
               catalog: workspace
               bronze_schema: ${resources.schemas.bronze_schema.name}
+              silver_schema: ${resources.schemas.silver_schema.name}
               incoming_volume: ${resources.volumes.incoming.name}

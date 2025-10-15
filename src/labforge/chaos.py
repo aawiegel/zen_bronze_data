@@ -156,12 +156,15 @@ def chaos_invalid_db_chars(
     for col in df.columns:
         if generator.random() < probability:
             new_col = col
+            col_lower = col.lower()
 
-            # # prefix for id columns
-            if "id" in col.lower() and not col.startswith("#"):
+            # # prefix for ID columns (must end with _id or be exactly "id")
+            if (col_lower.endswith("_id") or col_lower == "id") and not col.startswith(
+                "#"
+            ):
                 new_col = "#" + new_col
             # % suffix for percentage/pct columns
-            elif "pct" in col.lower() or "percent" in col.lower():
+            elif "pct" in col_lower or "percent" in col_lower:
                 new_col = new_col.replace("_pct", "%").replace("_percent", "%")
             # Replace underscores with hyphens
             elif "_" in new_col:

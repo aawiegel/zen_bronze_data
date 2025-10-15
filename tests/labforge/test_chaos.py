@@ -245,6 +245,30 @@ def test_chaos_invalid_db_chars_id_columns(np_number_generator):
     assert "#sample_id" in df_chaos.columns or "#lab_id" in df_chaos.columns
 
 
+def test_chaos_invalid_db_chars_id_edge_case(np_number_generator):
+    """Test that # is NOT added to columns that contain 'id' but aren't ID columns"""
+    df = pd.DataFrame(
+        {
+            "acidity": [5.5, 6.0, 6.5],
+            "humidity": [45.0, 50.0, 55.0],
+            "sample_id": [1, 2, 3],
+        }
+    )
+
+    df_chaos = chaos.chaos_invalid_db_chars(np_number_generator, df, probability=1.0)
+
+    # acidity and humidity should NOT get # prefix (they contain "id" but aren't ID columns)
+    assert not any(
+        col.startswith("#") and "acidity" in col.lower() for col in df_chaos.columns
+    )
+    assert not any(
+        col.startswith("#") and "humidity" in col.lower() for col in df_chaos.columns
+    )
+
+    # sample_id SHOULD get # prefix (ends with _id)
+    assert "#sample_id" in df_chaos.columns
+
+
 def test_chaos_invalid_db_chars_percentage_columns(np_number_generator):
     """Test that % suffix is added to percentage columns"""
     df = pd.DataFrame(

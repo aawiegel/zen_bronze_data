@@ -215,10 +215,10 @@ def test_chaos_empty_column_padding(np_number_generator):
     empty_cols = [col for col in df_chaos.columns if col == ""]
     assert len(empty_cols) == 2
 
-    # Empty columns should be all None (check by column position to avoid duplicate name issues)
+    # Empty columns should be all empty strings (check by column position to avoid duplicate name issues)
     # Last 2 columns should be the empty ones
-    assert df_chaos.iloc[:, -1].isna().all()
-    assert df_chaos.iloc[:, -2].isna().all()
+    assert (df_chaos.iloc[:, -1] == "").all()
+    assert (df_chaos.iloc[:, -2] == "").all()
 
 
 def test_chaos_empty_column_padding_random_count(np_number_generator):

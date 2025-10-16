@@ -198,22 +198,23 @@ def chaos_metadata_rows(
         >>> gen = np.random.default_rng(42)
         >>> df = pd.DataFrame({"sample_id": [1, 2], "ph": [6.5, 7.0]})
         >>> df_chaos = chaos_metadata_rows(gen, df, num_rows=2)
-        >>> # First 2 rows might be: ["Report Date: 2024-10-15", None, ...] and [None, None, ...]
+        >>> # First 2 rows might be: ["Report Date: 2024-10-15", "", ...] and ["", "", ...]
     """
     import numpy as np
 
     if num_rows is None:
         num_rows = generator.integers(1, 5)  # Random 1-4 metadata rows
 
+    # Use empty strings instead of None so PySpark doesn't complain about VOID type
     metadata_options = [
-        ["Lab Report", None, None],
-        ["Generated:", "2024-10-15", None],
-        ["Lab Name:", "Premium Soil Testing", None],
-        ["Contact:", "lab@testing.com", None],
+        ["Lab Report", "", ""],
+        ["Generated:", "2024-10-15", ""],
+        ["Lab Name:", "Premium Soil Testing", ""],
+        ["Contact:", "lab@testing.com", ""],
         ["", "", ""],  # Empty row
-        [None, None, None],  # Completely null row
-        ["Analysis Date", None, None],
-        ["Report ID:", f"RPT{generator.integers(1000, 9999)}", None],
+        ["", "", ""],  # Completely empty row
+        ["Analysis Date", "", ""],
+        ["Report ID:", f"RPT{generator.integers(1000, 9999)}", ""],
     ]
 
     # Create metadata rows
@@ -223,7 +224,7 @@ def chaos_metadata_rows(
         base_row = list(generator.choice(metadata_options))
         # Pad or truncate to match DataFrame width
         if len(base_row) < len(df.columns):
-            base_row.extend([None] * (len(df.columns) - len(base_row)))
+            base_row.extend([""] * (len(df.columns) - len(base_row)))
         else:
             base_row = base_row[: len(df.columns)]
         metadata_rows.append(base_row)
@@ -252,13 +253,13 @@ def chaos_empty_column_padding(
         num_columns: Number of empty columns to add (if None, randomly choose 1-3)
 
     Returns:
-        DataFrame with additional empty columns (empty string names, None values)
+        DataFrame with additional empty columns (empty string names, empty string values)
 
     Example:
         >>> gen = np.random.default_rng(42)
         >>> df = pd.DataFrame({"sample_id": [1, 2], "ph": [6.5, 7.0]})
         >>> df_chaos = chaos_empty_column_padding(gen, df, num_columns=2)
-        >>> # Adds 2 columns with "" as column name, all values None
+        >>> # Adds 2 columns with "" as column name, all values empty strings
     """
     import numpy as np
 
@@ -267,12 +268,13 @@ def chaos_empty_column_padding(
 
     # Add empty columns at the end using insert()
     # Allow duplicate empty string column names
+    # Use empty strings instead of None so PySpark doesn't complain about VOID type
     for i in range(num_columns):
         # Insert at the end (current length is the next index position)
         df.insert(
             len(df.columns),
             "",
-            pd.Series([None] * len(df), dtype=object),
+            pd.Series([""] * len(df), dtype=object),
             allow_duplicates=True,
         )
 

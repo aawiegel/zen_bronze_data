@@ -2,7 +2,7 @@ import pytest
 import tempfile
 import os
 
-from parse.base import CSVTableParser
+from src.parse.base import CSVTableParser
 
 
 def test_clean_columns_removes_none_columns():

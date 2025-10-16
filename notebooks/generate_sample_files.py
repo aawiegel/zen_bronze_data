@@ -8,7 +8,9 @@
 # MAGIC **Demonstrates:**
 # MAGIC - Multiple vendor schemas (Vendor A vs Vendor B)
 # MAGIC - Additive measurement packages
-# MAGIC - Header chaos (typos, casing, whitespace, unnamed columns)
+# MAGIC - Header chaos (typos, casing, whitespace, invalid database characters)
+# MAGIC - Metadata rows at the top of files (lab report headers, empty rows)
+# MAGIC - Empty padding columns (blank column names with no data)
 # MAGIC - Real-world CSV nightmares for demo purposes
 
 # COMMAND ----------
@@ -86,7 +88,6 @@ files_to_generate = [
             "header_typos": 0.8,
             "header_casing": 0.0,
             "header_whitespace": 0.0,
-            "add_unnamed_columns": False,
         },
     },
     {
@@ -99,7 +100,6 @@ files_to_generate = [
             "header_typos": 0.0,
             "header_casing": 0.9,
             "header_whitespace": 0.0,
-            "add_unnamed_columns": False,
         },
     },
     {
@@ -112,7 +112,6 @@ files_to_generate = [
             "header_typos": 0.0,
             "header_casing": 0.0,
             "header_whitespace": 0.7,
-            "add_unnamed_columns": False,
         },
     },
     {
@@ -125,8 +124,10 @@ files_to_generate = [
             "header_typos": 0.3,
             "header_casing": 0.3,
             "header_whitespace": 0.2,
-            "add_unnamed_columns": True,
-            "num_unnamed": 3,
+            "add_metadata_rows": True,
+            "num_metadata": 2,
+            "add_empty_padding": True,
+            "num_empty": 3,
         },
     },
     # Vendor B - Clean files
@@ -155,7 +156,6 @@ files_to_generate = [
             "header_typos": 0.5,
             "header_casing": 0.5,
             "header_whitespace": 0.3,
-            "add_unnamed_columns": False,
         },
     },
     {
@@ -168,8 +168,10 @@ files_to_generate = [
             "header_typos": 0.6,
             "header_casing": 0.6,
             "header_whitespace": 0.4,
-            "add_unnamed_columns": True,
-            "num_unnamed": 5,
+            "add_metadata_rows": True,
+            "num_metadata": 3,
+            "add_empty_padding": True,
+            "num_empty": 5,
         },
     },
     {
@@ -183,7 +185,6 @@ files_to_generate = [
             "header_casing": 0.0,
             "header_whitespace": 0.0,
             "invalid_db_chars": 1.0,
-            "add_unnamed_columns": False,
         },
     },
 ]
@@ -256,16 +257,18 @@ for file_config in files_to_generate:
 print("Loading metadata tables to Delta...")
 
 # Load analyte dimension to silver (clean reference data)
-analyte_df = spark.read.option("header", "true").option("inferSchema", "true").csv(
-    analyte_dim_path
+analyte_df = (
+    spark.read.option("header", "true")
+    .option("inferSchema", "true")
+    .csv(analyte_dim_path)
 )
 analyte_table_name = f"{catalog}.{silver_schema}.analyte_dimension"
 analyte_df.write.mode("overwrite").saveAsTable(analyte_table_name)
 print(f"  ✓ Analyte dimension saved to {analyte_table_name}")
 
 # Load vendor-analyte mapping to bronze (raw mapping data)
-mapping_df = spark.read.option("header", "true").option("inferSchema", "true").csv(
-    mapping_path
+mapping_df = (
+    spark.read.option("header", "true").option("inferSchema", "true").csv(mapping_path)
 )
 mapping_table_name = f"{catalog}.{bronze_schema}.vendor_analyte_mapping"
 mapping_df.write.mode("overwrite").saveAsTable(mapping_table_name)
@@ -281,7 +284,7 @@ print()
 # MAGIC - **Metadata tables** (analyte_dimension.csv, vendor_analyte_mapping.csv)
 # MAGIC - **Clean files** showing legitimate vendor schema variations
 # MAGIC - **Messy files** with header typos, casing issues, whitespace
-# MAGIC - **Excel nightmares** with unnamed columns
+# MAGIC - **Excel nightmares** with metadata rows at the top and empty padding columns
 # MAGIC - **Database nightmares** with invalid column name characters (#, %, -)
 # MAGIC
 # MAGIC These files are ready to be processed by your bronze → silver transformation logic!

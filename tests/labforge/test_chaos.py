@@ -163,51 +163,87 @@ def test_chaos_modifies_in_place(np_number_generator):
     assert df.columns.tolist() != original_columns
 
 
-def test_chaos_unnamed_columns(np_number_generator):
-    """Test that unnamed columns are added"""
-    df = pd.DataFrame(
-        {
-            "column_a": [1, 2, 3],
-            "column_b": [4, 5, 6],
-        }
-    )
-
-    df_chaos = chaos.chaos_unnamed_columns(np_number_generator, df, num_columns=3)
-
-    # Should have 3 additional unnamed columns
-    assert len(df_chaos.columns) == 5  # 2 original + 3 unnamed
-
-    # Check unnamed column names
-    assert "Unnamed: 2" in df_chaos.columns
-    assert "Unnamed: 3" in df_chaos.columns
-    assert "Unnamed: 4" in df_chaos.columns
-
-    # Unnamed columns should be all NaN
-    assert df_chaos["Unnamed: 2"].isna().all()
-    assert df_chaos["Unnamed: 3"].isna().all()
-
-
-def test_chaos_unnamed_columns_random_count(np_number_generator):
-    """Test that unnamed columns with None generates random count"""
-    df = pd.DataFrame(
-        {
-            "column_a": [1, 2, 3],
-        }
-    )
-
-    df_chaos = chaos.chaos_unnamed_columns(np_number_generator, df, num_columns=None)
-
-    # Should have at least 1 and at most 5 additional columns (1-5 range)
-    assert len(df_chaos.columns) >= 2  # 1 original + at least 1 unnamed
-    assert len(df_chaos.columns) <= 6  # 1 original + at most 5 unnamed
-
-
-def test_apply_chaos_with_unnamed_columns(np_number_generator):
-    """Test that apply_chaos can add unnamed columns"""
+def test_chaos_metadata_rows(np_number_generator):
+    """Test that metadata rows are added at the top"""
     df = pd.DataFrame(
         {
             "sample_id": [1, 2, 3],
-            "value": [4, 5, 6],
+            "ph": [6.5, 7.0, 6.8],
+        }
+    )
+
+    df_chaos = chaos.chaos_metadata_rows(np_number_generator, df, num_rows=2)
+
+    # Should have 2 additional rows
+    assert len(df_chaos) == 5  # 3 original + 2 metadata
+
+    # First 2 rows should be metadata (likely have None or string values)
+    # Original numeric data should be pushed down
+    assert df_chaos.iloc[2, 0] == 1  # First original data row
+
+
+def test_chaos_metadata_rows_random_count(np_number_generator):
+    """Test that metadata rows with None generates random count"""
+    df = pd.DataFrame(
+        {
+            "column_a": [1, 2, 3],
+        }
+    )
+
+    df_chaos = chaos.chaos_metadata_rows(np_number_generator, df, num_rows=None)
+
+    # Should have at least 1 and at most 4 additional rows (1-4 range)
+    assert len(df_chaos) >= 4  # 3 original + at least 1 metadata
+    assert len(df_chaos) <= 7  # 3 original + at most 4 metadata
+
+
+def test_chaos_empty_column_padding(np_number_generator):
+    """Test that empty columns with empty string names are added"""
+    df = pd.DataFrame(
+        {
+            "sample_id": [1, 2, 3],
+            "ph": [6.5, 7.0, 6.8],
+        }
+    )
+
+    df_chaos = chaos.chaos_empty_column_padding(np_number_generator, df, num_columns=2)
+
+    # Should have 2 additional empty columns
+    assert len(df_chaos.columns) == 4  # 2 original + 2 empty
+
+    # Check that there are empty string column names
+    empty_cols = [col for col in df_chaos.columns if col == ""]
+    assert len(empty_cols) == 2
+
+    # Empty columns should be all None (check by column position to avoid duplicate name issues)
+    # Last 2 columns should be the empty ones
+    assert df_chaos.iloc[:, -1].isna().all()
+    assert df_chaos.iloc[:, -2].isna().all()
+
+
+def test_chaos_empty_column_padding_random_count(np_number_generator):
+    """Test that empty padding with None generates random count"""
+    df = pd.DataFrame(
+        {
+            "column_a": [1, 2, 3],
+        }
+    )
+
+    df_chaos = chaos.chaos_empty_column_padding(
+        np_number_generator, df, num_columns=None
+    )
+
+    # Should have at least 1 and at most 3 additional columns (1-3 range)
+    assert len(df_chaos.columns) >= 2  # 1 original + at least 1 empty
+    assert len(df_chaos.columns) <= 4  # 1 original + at most 3 empty
+
+
+def test_apply_chaos_with_metadata_and_padding(np_number_generator):
+    """Test that apply_chaos can add metadata rows and empty padding"""
+    df = pd.DataFrame(
+        {
+            "sample_id": [1, 2, 3],
+            "ph": [6.5, 7.0, 6.8],
         }
     )
 
@@ -217,16 +253,21 @@ def test_apply_chaos_with_unnamed_columns(np_number_generator):
         header_typos=0.0,
         header_casing=0.0,
         header_whitespace=0.0,
-        add_unnamed_columns=True,
-        num_unnamed=2,
+        add_metadata_rows=True,
+        num_metadata=2,
+        add_empty_padding=True,
+        num_empty=2,
     )
 
-    # Should have 2 additional columns
-    assert len(df_chaos.columns) == 4
+    # Should have 2 additional rows
+    assert len(df_chaos) == 5  # 3 original + 2 metadata
 
-    # Check for unnamed columns
-    has_unnamed = any("Unnamed:" in str(col) for col in df_chaos.columns)
-    assert has_unnamed
+    # Should have 2 additional columns
+    assert len(df_chaos.columns) == 4  # 2 original + 2 empty
+
+    # Check for empty string columns
+    empty_cols = [col for col in df_chaos.columns if col == ""]
+    assert len(empty_cols) == 2
 
 
 def test_chaos_invalid_db_chars_id_columns(np_number_generator):

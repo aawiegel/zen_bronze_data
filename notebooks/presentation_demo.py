@@ -434,7 +434,7 @@ spark_df_db_nightmare = spark.read.option("header", "true").csv(
 )
 
 print("😤 Look at these column names:")
-for col in spark_df_db_nightmare.columns[:10]:
+for col in spark_df_db_nightmare.columns:
     print(f"  {col}")
 
 # COMMAND ----------
@@ -774,7 +774,7 @@ spark_df_standardized = (
         spark_analyte_dim.analyte_id,
         spark_analyte_dim.analyte_name,
         spark_analyte_dim.data_type,
-        spark_analyte_dim.units
+        spark_analyte_dim.unit
     )
 )
 
@@ -814,7 +814,7 @@ spark_df_vendor_b_standardized = (
         spark_analyte_dim.analyte_id,
         spark_analyte_dim.analyte_name,
         spark_analyte_dim.data_type,
-        spark_analyte_dim.units
+        spark_analyte_dim.unit
     )
 )
 
@@ -983,7 +983,7 @@ print("✨ Clean, testable, maintainable.")
 # MAGIC
 # MAGIC **Common Objections:**
 # MAGIC
-# MAGIC **Q: "Doesn't using csv instead hurt performance?"**
+# MAGIC **Q: "Doesn't using the csv module instead hurt performance?"**
 # MAGIC
 # MAGIC A: The individual vendor files are typically not large. We're trading N vendor-specific transformation functions for 1 unpivot + 1 join. And Delta handles long-format data efficiently.
 # MAGIC

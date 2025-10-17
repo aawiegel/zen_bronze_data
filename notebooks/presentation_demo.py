@@ -282,43 +282,7 @@ print("📊 Fixed columns:", spark_df_typos_fixed.columns[:5])
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Problem 4: Inconsistent Casing
-# MAGIC
-# MAGIC "SOME columns ARE rAnDoM CaSe?!"
-
-# COMMAND ----------
-
-# Load file with casing chaos
-spark_df_casing = spark.read.option("header", "true").csv(
-    f"{VOLUME_PATH}/vendor_a_full_messy_casing.csv"
-)
-
-print("🤪 Look at this casing chaos:")
-for col in spark_df_casing.columns[:8]:
-    print(f"  {col}")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ### Bronze Layer: Approach 5 (Add Case Normalization)
-# MAGIC
-# MAGIC "We'll just lowercase everything..."
-
-# COMMAND ----------
-
-def normalize_casing(df):
-    """Normalize all column names to lowercase with underscores"""
-    return df.select([F.col(f"`{c}`").alias(c.lower()) for c in df.columns])
-
-spark_df_casing_normalized = normalize_casing(spark_df_casing)
-
-print("✅ Fixed! Everything lowercase...")
-print("📊 Normalized columns:", spark_df_casing_normalized.columns[:5])
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Problem 5: Excel Nightmares
+# MAGIC ## Problem 4: Excel Nightmares
 # MAGIC
 # MAGIC "This file has metadata rows at the top AND empty columns on the right!"
 
@@ -368,7 +332,7 @@ display(spark_df_excel_nightmare.limit(5))
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### Bronze Layer: Approach 6 (Add Header Detection & Empty Column Removal)
+# MAGIC ### Bronze Layer: Approach 5 (Add Header Detection & Empty Column Removal)
 # MAGIC
 # MAGIC "We need to detect where the REAL header is AND remove empty columns..."
 # MAGIC
@@ -422,7 +386,7 @@ print(f"📊 Reduced column count: {len(spark_df_excel_cleaned.columns)}")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Problem 6: Invalid Database Characters
+# MAGIC ## Problem 5: Invalid Database Characters
 # MAGIC
 # MAGIC "Someone put # and % in the column names?!"
 
@@ -440,7 +404,7 @@ for col in spark_df_db_nightmare.columns:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### Bronze Layer: Approach 7 (Add Character Sanitization)
+# MAGIC ### Bronze Layer: Approach 6 (Add Character Sanitization)
 # MAGIC
 # MAGIC "We'll strip out invalid characters..."
 
@@ -494,23 +458,20 @@ def load_vendor_to_bronze(file_path, vendor_name, analysis_package):
     # Step 4: Fix typos in headers
     df = fix_typos(df)
 
-    # Step 5: Normalize casing
-    df = normalize_casing(df)
-
-    # Step 6: Remove empty columns
+    # Step 5: Remove empty columns
     df = remove_empty_columns(df)
 
-    # Step 7: Sanitize invalid DB characters
+    # Step 6: Sanitize invalid DB characters
     df = sanitize_db_chars(df)
 
-    # Step 8: Apply vendor-specific column mapping
+    # Step 7: Apply vendor-specific column mapping
     if vendor_name == "vendor_b":
         df = standardize_vendor_b_columns(df)
     elif vendor_name == "vendor_c":
         df = standardize_vendor_c_columns(df)  # And more for each vendor!
     # ... and so on for each new vendor
 
-    # Step 9: Write to bronze
+    # Step 8: Write to bronze
     df.write.format("delta").mode("append").option("mergeSchema", "true").saveAsTable("bronze.lab_samples")
 
     return df
@@ -947,6 +908,130 @@ def bronze_to_silver():
     return silver_df
 
 print("✨ Clean, testable, maintainable.")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ---
+# MAGIC # Important Caveats ⚠️
+# MAGIC
+# MAGIC ## This Isn't a Silver Bullet!
+# MAGIC
+# MAGIC Before you run off and pivot everything, let's talk about when this approach works and when it doesn't.
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### ⚠️ When NOT to Use This Pattern
+# MAGIC
+# MAGIC **Entity-Attribute-Value (EAV) is usually an anti-pattern!**
+# MAGIC
+# MAGIC Don't use this approach if:
+# MAGIC
+# MAGIC 1. **You have a stable, well-defined schema**
+# MAGIC    - If your data sources have consistent columns, just use a normal table!
+# MAGIC    - EAV adds complexity you don't need
+# MAGIC
+# MAGIC 2. **You need to query the data in wide format frequently**
+# MAGIC    - If analysts want `SELECT ph, copper_ppm, zinc_ppm FROM samples`, pivoting back is expensive
+# MAGIC    - Only use EAV if the Bronze layer is truly just for landing raw data
+# MAGIC
+# MAGIC 3. **You have strong typing requirements**
+# MAGIC    - Everything becomes a string in the `lab_provided_value` column
+# MAGIC    - Type conversion happens in Silver, not Bronze
+# MAGIC
+# MAGIC 4. **Performance is critical**
+# MAGIC    - EAV tables are generally slower to query than wide tables
+# MAGIC    - More rows = more data to scan
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### ✅ When This Pattern Works Well
+# MAGIC
+# MAGIC This approach shines when:
+# MAGIC
+# MAGIC 1. **Schema is highly unstable**
+# MAGIC    - Different vendors have different columns
+# MAGIC    - Same vendor changes columns based on analysis package
+# MAGIC    - New analytes or metadata are added regularly (This happens ALL the time in scientific research!!)
+# MAGIC
+# MAGIC 2. **You're dealing with semi-structured vendor data**
+# MAGIC    - CSV/Excel files with vendor-specific quirks
+# MAGIC    - Column names can't be trusted (typos, casing, whitespace)
+# MAGIC    - Metadata rows and empty columns
+# MAGIC
+# MAGIC 3. **The Bronze layer is truly "just land it"**
+# MAGIC    - Silver layer transforms to a proper wide format
+# MAGIC    - Gold layer is where analysts query
+# MAGIC    - Bronze is just the ingestion buffer
+# MAGIC
+# MAGIC 4. **Business logic is maintained by non-developers**
+# MAGIC    - Column mappings can be updated via data, not code
+# MAGIC    - No deployments needed for new vendors/analytes
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### 🔧 What We Left Out (For Simplicity)
+# MAGIC
+# MAGIC In a production implementation, you'd also need:
+# MAGIC
+# MAGIC 1. **File metadata tracking**
+# MAGIC    - Which file did this data come from?
+# MAGIC    - When was it ingested?
+# MAGIC    - Original file path, size, checksum
+# MAGIC
+# MAGIC 2. **Row-level metadata**
+# MAGIC    - Some columns aren't measurements (e.g., `sample_barcode`, `lab_id`, `date_received`)
+# MAGIC    - These need to be pivoted back out or stored separately
+# MAGIC    - Example: You'd want `sample_barcode` as a column in Silver, not an attribute
+# MAGIC
+# MAGIC 3. **Data quality flags**
+# MAGIC    - Did the value parse successfully?
+# MAGIC    - Was the column mapped to a known analyte?
+# MAGIC    - Were there any warnings during parsing?
+# MAGIC    - Data profiling / monitoring (e.g., we can see exactly how unstable the provided attributes are for each vendor!)    
+# MAGIC
+# MAGIC 4. **Incremental loading**
+# MAGIC    - How do you avoid re-processing files?
+# MAGIC    - Change data capture for mapping table updates
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### 💡 A Better Silver Layer
+# MAGIC
+# MAGIC In reality, your Silver transformation would do something like:
+# MAGIC
+# MAGIC ```python
+# MAGIC # Separate metadata columns from measurement columns (These would be tracked in your through table ideally)
+# MAGIC metadata_cols = ['sample_barcode', 'lab_id', 'date_received', 'date_processed']
+# MAGIC
+# MAGIC # Extract metadata (those columns that are the same for each row in the original file)
+# MAGIC metadata_df = bronze_df.filter(
+# MAGIC     F.col("lab_provided_attribute").isin(metadata_cols)
+# MAGIC ).groupBy("file_id", "row_index").pivot("lab_provided_attribute").agg(F.first("lab_provided_value"))
+# MAGIC
+# MAGIC # Extract measurements (join with mapping table)
+# MAGIC measurements_df = bronze_df.join(
+# MAGIC     mapping_df,
+# MAGIC     bronze_df.lab_provided_attribute == mapping_df.vendor_column_name,
+# MAGIC     "inner"  # Only keep mapped columns
+# MAGIC ).join(
+# MAGIC     analyte_dim,
+# MAGIC     mapping_df.analyte_id == analyte_dim.analyte_id,
+# MAGIC     "left"
+# MAGIC )
+# MAGIC
+# MAGIC # Join metadata + measurements
+# MAGIC silver_df = metadata_df.join(measurements_df, ["file_id", "row_index"])
+# MAGIC ```
+# MAGIC
+# MAGIC This gives you a Silver table with:
+# MAGIC - Metadata columns (sample_barcode, lab_id, dates) as regular columns
+# MAGIC - Measurements in long format (or pivoted wide if needed)
+# MAGIC - Type-safe values (numeric columns actually numeric!)
 
 # COMMAND ----------
 

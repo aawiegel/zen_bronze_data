@@ -5,10 +5,10 @@
 # MAGIC
 # MAGIC ### When "Keeping It Simple" Makes It Complex
 # MAGIC
-# MAGIC Today I want to show you how trying to keep our bronze layer "simple" made it incredibly **complex** -
+# MAGIC Today I want to show you how trying to keep our bronze ingestion layer "simple" made it incredibly **complex** -
 # MAGIC and how going back to basics actually solved everything.
 # MAGIC
-# MAGIC **The Setup:** We're ingesting soil sample lab results from multiple vendors. Each vendor has their own CSV schema.
+# MAGIC **Background:** Often biotech companies work with contract research organizations to perform specialized measurements. Often, these lab vendors can only provide data back as CSV (or Excel) files. Even if they're performing the same types of measurements, each vendor has their own CSV schema. We want to ingest data from each vendor and make it available for analysis.
 # MAGIC
 # MAGIC **The Journey:**
 # MAGIC 1. Start with a clean, simple file ✨
@@ -19,7 +19,9 @@
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Quick Context: The Medallion Architecture
+# MAGIC ## The Medallion Architecture
+# MAGIC
+# MAGIC ![](./Medallion.png)
 # MAGIC
 # MAGIC For those new to the pattern:
 # MAGIC - **Bronze** = Raw data, as close to source as possible
@@ -84,8 +86,8 @@ display(spark_df_clean.limit(5))
 
 # COMMAND ----------
 
-# Write to bronze (commented out to not actually write during demo)
-# spark_df_clean.write.format("delta").mode("overwrite").saveAsTable("bronze.vendor_a_samples")
+# Write to bronze
+spark_df_clean.write.format("delta").mode("overwrite").saveAsTable(f"{catalog}.{bronze_schema}.vendor_a_samples")
 
 print("✅ Bronze table created!")
 print("📊 Columns:", spark_df_clean.columns)
@@ -94,7 +96,7 @@ print("📈 Rows:", spark_df_clean.count())
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### That was easy!
+# MAGIC ### That was easy! What was the big deal? Can we just get a beer and call it a day?
 # MAGIC
 # MAGIC *...but then reality hits* 😅
 
@@ -115,8 +117,8 @@ spark_df_vendor_b = spark.read.option("header", "true").csv(
     f"{VOLUME_PATH}/vendor_b_standard_clean.csv"
 )
 
-print("🔍 Vendor A columns:", spark_df_clean.columns[:5])
-print("🔍 Vendor B columns:", spark_df_vendor_b.columns[:5])
+print("🔍 Vendor A columns:", spark_df_clean.columns)
+print("🔍 Vendor B columns:", spark_df_vendor_b.columns)
 print("\n❌ They don't match! We need to standardize...")
 
 # COMMAND ----------
@@ -133,9 +135,9 @@ def standardize_vendor_b_columns(df):
     """Map Vendor B columns to standard names"""
     return df.select(
         F.col("sample_barcode"),
-        F.col("laboratory_id").alias("lab_id"),  # Different name!
-        F.col("received_date").alias("date_received"),  # Different name!
-        F.col("processed_date").alias("date_processed"),  # Different name!
+        F.col("lab_id"),
+        F.col("date_received"),
+        F.col("date_processed"),
         F.col("acidity").alias("ph"),  # Different name!
         F.col("cu_total").alias("copper_ppm"),  # Different name!
         F.col("zn_total").alias("zinc_ppm"),  # Different name!
@@ -149,6 +151,10 @@ print("📊 Standardized columns:", spark_df_vendor_b_standardized.columns)
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC So what's the big deal? And how about that beer?
+# MAGIC
+# MAGIC Well....
+# MAGIC
 # MAGIC ## Problem 2: Whitespace in Headers
 # MAGIC
 # MAGIC "Wait, some files have spaces around column names?!"
@@ -161,7 +167,7 @@ spark_df_whitespace = spark.read.option("header", "true").csv(
 )
 
 print("😱 Look at these column names:")
-for col in spark_df_whitespace.columns[:5]:
+for col in spark_df_whitespace.columns:
     print(f"  '{col}' (length: {len(col)})")
 
 # COMMAND ----------
@@ -180,7 +186,7 @@ def clean_whitespace(df):
 spark_df_whitespace_cleaned = clean_whitespace(spark_df_whitespace)
 
 print("✅ Fixed! Trimmed all column names...")
-print("📊 Cleaned columns:", spark_df_whitespace_cleaned.columns[:5])
+print("📊 Cleaned columns:", spark_df_whitespace_cleaned.columns)
 
 # COMMAND ----------
 
@@ -484,11 +490,42 @@ print("📊 Sanitized columns:", spark_df_db_sanitized.columns[:8])
 # MAGIC ---
 # MAGIC # Act 4: The Pivot Revelation 💡
 # MAGIC
-# MAGIC ## What if we went BACK to basics?
+# MAGIC ## What if we let ourselves be like leaves floating on the water and just accepted all this chaos?
 # MAGIC
-# MAGIC Instead of trying to standardize the COLUMNS, what if we just accepted that every vendor is different?
+# MAGIC In other words, instead of trying to standardize the COLUMNS, what if we just started treating them like data?
 # MAGIC
 # MAGIC **The Insight:** The "raw" format isn't the wide CSV - it's the individual measurements!
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### First, Let's Create a parser for this data
+# MAGIC
+# MAGIC Here's the code that handles all that chaos:
+
+# COMMAND ----------
+
+import inspect
+from src.parse import CSVTableParser
+
+# Display the parser source code
+print("=" * 80)
+print("CSVTableParser Implementation")
+print("=" * 80)
+print(inspect.getsource(CSVTableParser))
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC **Key things to notice:**
+# MAGIC - This uses the `csv` module to load data in an unopinionated way (compared to pandas or pyspark)
+# MAGIC - `remove_header()`: Detects where real data starts (skips metadata rows)
+# MAGIC - `clean_columns()`: Removes empty columns and deduplicates names
+# MAGIC - `unpivot()`: Transforms wide → long format
+# MAGIC - Preserves row/column position for traceability
+# MAGIC - Keeps original column names (even with typos!)
+# MAGIC
+# MAGIC Now let's see it in action...
 
 # COMMAND ----------
 
@@ -501,39 +538,9 @@ print("📊 Sanitized columns:", spark_df_db_sanitized.columns[:8])
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ### First, Let's See What the Parser Actually Does
-# MAGIC
-# MAGIC Here's the code that handles all that chaos:
-
-# COMMAND ----------
-
-import inspect
-from parse import CSVTableParser
-
-# Display the parser source code
-print("=" * 80)
-print("CSVTableParser Implementation")
-print("=" * 80)
-print(inspect.getsource(CSVTableParser))
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC **Key things to notice:**
-# MAGIC - `remove_header()`: Detects where real data starts (skips metadata rows)
-# MAGIC - `clean_columns()`: Removes empty columns and deduplicates names
-# MAGIC - `unpivot()`: Transforms wide → long format
-# MAGIC - Preserves row/column position for traceability
-# MAGIC - Keeps original column names (even with typos!)
-# MAGIC
-# MAGIC Now let's see it in action...
-
-# COMMAND ----------
-
 # Use our CSV parser to unpivot the messy file
 parser = CSVTableParser({"header_detection_threshold": 5})
-records = parser.parse(f"{VOLUME_PATH}/vendor_a_basic_excel_nightmare.csv")
+records = parser.parse(f"{VOLUME_PATH}/vendor_a_basic_excel_nightmare.csv/part-00000-tid-8961082112397051538-fc688257-b742-4979-814c-837dadb18d51-139-1-c000.csv")
 
 # Convert to Spark DataFrame
 spark_df_unpivoted = spark.createDataFrame(records)
@@ -563,7 +570,7 @@ display(spark_df_unpivoted.limit(10))
 # MAGIC %md
 # MAGIC ### Step 2: Load the Mapping Table
 # MAGIC
-# MAGIC Now we just need ONE mapping table that says "this vendor's column name = this standard analyte"
+# MAGIC Now we just need ONE mapping table that says "this vendor's column name = this standard analyte".
 
 # COMMAND ----------
 
@@ -571,7 +578,7 @@ display(spark_df_unpivoted.limit(10))
 spark_mapping = spark.table(f"{catalog}.{bronze_schema}.vendor_analyte_mapping")
 
 print("📋 The mapping table:")
-display(spark_mapping.filter(F.col("vendor") == "vendor_a").limit(10))
+display(spark_mapping.filter(F.col("vendor_id") == "vendor_a").limit(10))
 
 # COMMAND ----------
 
@@ -607,7 +614,7 @@ display(spark_df_standardized.filter(F.col("standardized_analyte").isNotNull()).
 # COMMAND ----------
 
 # Parse Vendor B's messy file (totally different schema!)
-records_vendor_b = parser.parse(f"{VOLUME_PATH}/vendor_b_full_excel_disaster.csv")
+records_vendor_b = parser.parse(f"{VOLUME_PATH}/vendor_b_full_excel_disaster.csv/part-00000-tid-7387106036713521623-54db8045-3310-4ad3-8b0c-6d36db9bb6e9-143-1-c000.csv")
 spark_df_vendor_b_unpivoted = spark.createDataFrame(records_vendor_b)
 
 # Same join logic works!
@@ -787,9 +794,9 @@ display(spark_df_vendor_b_standardized.filter(F.col("standardized_analyte").isNo
 # MAGIC
 # MAGIC **Common Objections:**
 # MAGIC
-# MAGIC **Q: "Doesn't unpivoting hurt performance?"**
+# MAGIC **Q: "Doesn't using csv instead hurt performance?"**
 # MAGIC
-# MAGIC A: Unpivot is cheap. We're trading N vendor-specific transformation functions for 1 unpivot + 1 join. And Delta handles long-format data efficiently.
+# MAGIC A: The individual vendor files are typically not large. We're trading N vendor-specific transformation functions for 1 unpivot + 1 join. And Delta handles long-format data efficiently.
 # MAGIC
 # MAGIC **Q: "What about vendor-specific business logic?"**
 # MAGIC
@@ -810,3 +817,7 @@ display(spark_df_vendor_b_standardized.filter(F.col("standardized_analyte").isNo
 # MAGIC Questions? Comments? Horror stories about vendor CSV files?
 # MAGIC
 # MAGIC I'd love to hear them!
+
+# COMMAND ----------
+
+

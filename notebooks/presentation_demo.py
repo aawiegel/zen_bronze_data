@@ -1,38 +1,5 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # The Zen of the Bronze Layer
-# MAGIC ## Ingestion of Data with Unstable Schema
-# MAGIC
-# MAGIC ### When "Keeping It Simple" Makes It Complex
-# MAGIC
-# MAGIC Today I want to show you how trying to keep our bronze ingestion layer "simple" made it incredibly **complex** -
-# MAGIC and how going back to basics actually solved everything.
-# MAGIC
-# MAGIC **Background:** Often biotech companies work with contract research organizations to perform specialized measurements. Often, these lab vendors can only provide data back as CSV (or Excel) files. Even if they're performing the same types of measurements, each vendor has their own CSV schema. We want to ingest data from each vendor and make it available for analysis.
-# MAGIC
-# MAGIC **The Journey:**
-# MAGIC 1. Start with a clean, simple file ✨
-# MAGIC 2. Add complexity one problem at a time 😰
-# MAGIC 3. Watch our bronze layer transform into spaghetti 🍝
-# MAGIC 4. Discover a better way 💡
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## The Medallion Architecture
-# MAGIC
-# MAGIC ![](./Medallion.png)
-# MAGIC
-# MAGIC For those new to the pattern:
-# MAGIC - **Bronze** = Raw data, as close to source as possible
-# MAGIC - **Silver** = Cleaned, conformed, business logic applied
-# MAGIC - **Gold** = Aggregated, ready for analytics
-# MAGIC
-# MAGIC Today we're focusing on **Bronze** - and questioning what "raw" really means.
-
-# COMMAND ----------
-
-# MAGIC %md
 # MAGIC ## Setup
 
 # COMMAND ----------
@@ -64,6 +31,34 @@ print(f"📂 Using volume path: {VOLUME_PATH}")
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC # The Zen of the Bronze Layer
+# MAGIC ## Ingestion of Data with Unstable Schema
+# MAGIC
+# MAGIC ### When "Keeping It Simple" Makes It Complex
+# MAGIC
+# MAGIC Today I want to show you how trying to keep our bronze ingestion layer "simple" made it incredibly **complex** -
+# MAGIC and how going back to basics actually solved everything.
+# MAGIC
+# MAGIC **Background:** Often biotech companies work with contract research organizations to perform specialized measurements. Often, these lab vendors can only provide data back as CSV (or Excel) files. Even if they're performing the same types of measurements, each vendor has their own CSV schema. We want to ingest data from each vendor and make it available for analysis.
+# MAGIC
+# MAGIC **The Journey:**
+# MAGIC 1. Start with a clean, simple file ✨
+# MAGIC 2. Add complexity one problem at a time 😰
+# MAGIC 3. Watch our bronze layer transform into spaghetti 🍝
+# MAGIC 4. Discover a better way 💡
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## The Medallion Architecture
+# MAGIC
+# MAGIC ![](./Medallion.png)
+# MAGIC
+# MAGIC Today we're focusing on **Bronze** - and questioning what "raw" really means.
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ---
 # MAGIC # Act 1: The Simple Beginning 🌟
 # MAGIC
@@ -71,7 +66,6 @@ print(f"📂 Using volume path: {VOLUME_PATH}")
 
 # COMMAND ----------
 
-# Load a CLEAN vendor file (no chaos!)
 spark_df_clean = spark.read.option("header", "true").csv(
     f"{VOLUME_PATH}/vendor_a_basic_clean.csv"
 )
@@ -386,9 +380,9 @@ print(f"📊 Reduced column count: {len(spark_df_excel_cleaned.columns)}")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Problem 5: Invalid Database Characters
+# MAGIC ## Problem 5: Invalid or Annoying Database Characters
 # MAGIC
-# MAGIC "Someone put # and % in the column names?!"
+# MAGIC "Someone put # and % in the column names?! Now I have to type `` each time I want to access a column!"
 
 # COMMAND ----------
 
@@ -406,7 +400,7 @@ for col in spark_df_db_nightmare.columns:
 # MAGIC %md
 # MAGIC ### Bronze Layer: Approach 6 (Add Character Sanitization)
 # MAGIC
-# MAGIC "We'll strip out invalid characters..."
+# MAGIC "We'll strip out nonstandard characters..."
 
 # COMMAND ----------
 
@@ -539,7 +533,7 @@ print("😰 Look at all those steps... and this is supposed to be 'just load the
 
 # COMMAND ----------
 
-# This is the actual CSVTableParser class (simplified version shown here for clarity)
+# CSVTableParser class (simplified version shown here for clarity)
 # Full implementation at: src/parse/base.py
 
 import csv
@@ -935,13 +929,14 @@ print("✨ Clean, testable, maintainable.")
 # MAGIC 2. **You need to query the data in wide format frequently**
 # MAGIC    - If analysts want `SELECT ph, copper_ppm, zinc_ppm FROM samples`, pivoting back is expensive
 # MAGIC    - Only use EAV if the Bronze layer is truly just for landing raw data
+# MAGIC    - Querying EAV tables can quickly turn nightmarish even for those well versed in SQL
 # MAGIC
 # MAGIC 3. **You have strong typing requirements**
 # MAGIC    - Everything becomes a string in the `lab_provided_value` column
 # MAGIC    - Type conversion happens in Silver, not Bronze
 # MAGIC
 # MAGIC 4. **Performance is critical**
-# MAGIC    - EAV tables are generally slower to query than wide tables
+# MAGIC    - EAV tables are generally slower to query than wide tables (depending on db)
 # MAGIC    - More rows = more data to scan
 
 # COMMAND ----------
@@ -1000,42 +995,6 @@ print("✨ Clean, testable, maintainable.")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### 💡 A Better Silver Layer
-# MAGIC
-# MAGIC In reality, your Silver transformation would do something like:
-# MAGIC
-# MAGIC ```python
-# MAGIC # Separate metadata columns from measurement columns (These would be tracked in your through table ideally)
-# MAGIC metadata_cols = ['sample_barcode', 'lab_id', 'date_received', 'date_processed']
-# MAGIC
-# MAGIC # Extract metadata (those columns that are the same for each row in the original file)
-# MAGIC metadata_df = bronze_df.filter(
-# MAGIC     F.col("lab_provided_attribute").isin(metadata_cols)
-# MAGIC ).groupBy("file_id", "row_index").pivot("lab_provided_attribute").agg(F.first("lab_provided_value"))
-# MAGIC
-# MAGIC # Extract measurements (join with mapping table)
-# MAGIC measurements_df = bronze_df.join(
-# MAGIC     mapping_df,
-# MAGIC     bronze_df.lab_provided_attribute == mapping_df.vendor_column_name,
-# MAGIC     "inner"  # Only keep mapped columns
-# MAGIC ).join(
-# MAGIC     analyte_dim,
-# MAGIC     mapping_df.analyte_id == analyte_dim.analyte_id,
-# MAGIC     "left"
-# MAGIC )
-# MAGIC
-# MAGIC # Join metadata + measurements
-# MAGIC silver_df = metadata_df.join(measurements_df, ["file_id", "row_index"])
-# MAGIC ```
-# MAGIC
-# MAGIC This gives you a Silver table with:
-# MAGIC - Metadata columns (sample_barcode, lab_id, dates) as regular columns
-# MAGIC - Measurements in long format (or pivoted wide if needed)
-# MAGIC - Type-safe values (numeric columns actually numeric!)
-
-# COMMAND ----------
-
-# MAGIC %md
 # MAGIC ---
 # MAGIC # Summary: What We Learned 🎓
 # MAGIC
@@ -1059,6 +1018,18 @@ print("✨ Clean, testable, maintainable.")
 # MAGIC    - ✅ Non-developers can maintain mappings
 # MAGIC
 # MAGIC **Going back to basics made everything simpler.** 💡
+# MAGIC
+# MAGIC # Contact
+# MAGIC
+# MAGIC You can contact me at aawiegel@gmail.com
+# MAGIC
+# MAGIC https://www.linkedin.com/in/aawiegel/
+# MAGIC
+# MAGIC The source code is avaialble at https://github.com/aawiegel/zen_bronze_data
+# MAGIC
+# MAGIC ![](./gh_qr_code.png)
+# MAGIC
+# MAGIC
 
 # COMMAND ----------
 

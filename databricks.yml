@@ -23,6 +23,11 @@ resources:
       name: silver
       catalog_name: workspace
       comment: "Silver layer schema for cleaned data"
+    
+    gold_schema:
+      name: gold
+      catalog_name: workspace
+      comment: "Gold layer schema for analysis-ready data sets"
 
   volumes:
     incoming:

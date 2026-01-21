@@ -10,9 +10,9 @@ SEEDED_BARCODE = "0653370610"
 
 def test_forge_barcode_default(np_number_generator):
     result = string.forge_barcode(np_number_generator)
-    assert (
-        result == SEEDED_BARCODE
-    ), "Incorrect random barcode generated given random seed"
+    assert result == SEEDED_BARCODE, (
+        "Incorrect random barcode generated given random seed"
+    )
 
 
 def test_forge_barcode_with_prefix(np_number_generator):

@@ -10,6 +10,8 @@
 # MAGIC - **Silver**: Cleaned and standardized data with proper types and column names
 # MAGIC - **Gold**: Analytics-ready aggregations optimized for dashboards and reports
 # MAGIC
+# MAGIC ![medallion](./Medallion.png)
+# MAGIC
 # MAGIC ## Our Use Case
 # MAGIC
 # MAGIC A soil chemistry lab (Vendor A) sends CSV files with sample measurements:

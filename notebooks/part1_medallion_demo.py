@@ -24,7 +24,7 @@
 # MAGIC %md
 # MAGIC ## Setup
 # MAGIC
-# MAGIC Configure the catalog and schema names for our three layers.
+# MAGIC Configure the catalog and schema names for our three layers and import relevant modules.
 
 # COMMAND ----------
 
@@ -54,57 +54,78 @@ print(f"File Path: {file_path}")
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## Bronze Layer: Raw Ingestion with Metadata
-# MAGIC
-# MAGIC The bronze layer preserves raw data with **minimal transformation**. We add only:
-# MAGIC - `batch_id`: Unique identifier for this file ingestion
-# MAGIC - `file_row_number`: Row position in the source file
-# MAGIC
-# MAGIC Everything else stays exactly as the vendor sent it.
-
-# COMMAND ----------
-
-from pyspark.sql import functions as F
 from datetime import datetime
 from uuid import uuid4
 
-# Register this file ingestion
-batch_id = str(uuid4())
-ingestion_timestamp = datetime.now()
+from pyspark.sql import functions as F
+from pyspark.sql.types import DoubleType, DateType
 
-print(f"Batch ID: {batch_id}")
-print(f"Ingestion Timestamp: {ingestion_timestamp}")
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Bronze Layer: Raw Ingestion with Metadata
+# MAGIC
+# MAGIC The bronze layer preserves raw data with **minimal transformation**. To demonstrate, first, let's load the sample data and explore it.
 
 # COMMAND ----------
 
 # Read vendor CSV (keeping everything as strings for now)
-df = spark.read.option("header", "true").csv(file_path)
+df = spark.read.option("header", "true").csv(file_path).select(["*", "_metadata"])
 
 print(f"Rows read: {df.count()}")
 print("\nSource schema:")
 df.printSchema()
+print("\nFirst five rows:")
+df.limit(5).display()
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC Here, we try to avoid making too many assumptions about the data and just load it as is into the system. This does not mean we're done! Just that we're breaking down the total extraction, transformation, and loading process into discrete, modular steps.
+# MAGIC
+# MAGIC Note the `.select(["*", "_metadata"])` part in loading the data. Databricks will actually track some basic information about the data provenance for you that in other systems you would have to track more manually. However, we also have additional metadata about the ingestion process to track:
+# MAGIC
+# MAGIC - `ingestion_id`: Unique identifier for this file ingest
+# MAGIC - `file_row_number`: Identify original position in file
+# MAGIC - `ingested_at`: Timestamp of the ingestion
+# MAGIC - `data_source`: Source of the data (in this case vendor A, but could be say SaaS database X)
+# MAGIC
+# MAGIC We could get more exhaustive than this (for example, including a pipeline code version hash from git), but we'll keep it simple for now.
 
 # COMMAND ----------
 
 # Add batch metadata (this is the ONLY transformation in bronze)
 df_bronze = (
     df
-    .withColumn("batch_id", F.lit(batch_id))
+    # Extract key fields from Databricks' _metadata
+    .withColumn("source_file_path", F.col("_metadata.file_path"))
+    .withColumn("source_file_name", F.col("_metadata.file_name"))
+    .withColumn("file_modified_at", F.col("_metadata.file_modification_time"))
+    
+    # Add our business metadata
+    .withColumn("ingestion_id", F.lit(str(uuid4())))
+    .withColumn("data_source", F.lit("vendor_a"))
+    .withColumn("ingested_at", F.current_timestamp())
     .withColumn("file_row_number", F.monotonically_increasing_id())
 )
 
+# COMMAND ----------
+
 # Write to bronze Delta table
-df_bronze.write.format("delta").mode("append").saveAsTable(
-    f"{catalog}.{bronze_schema}.vendor_samples_raw"
+df_bronze.write.format("delta").mode("overwrite").saveAsTable(
+    f"{catalog}.{bronze_schema}.vendor_a_samples_raw"
 )
 
-print(f"✓ Written to {catalog}.{bronze_schema}.vendor_samples_raw")
+print(f"✓ Written to {catalog}.{bronze_schema}.vendor_a_samples_raw")
 
 # COMMAND ----------
 
-# Display bronze data
-display(df_bronze.limit(10))
+# MAGIC %md
+# MAGIC We can now query the data in bronze and see both the raw values and the associated ingestion metadata.
+
+# COMMAND ----------
+
+spark.sql(f"SELECT * FROM {catalog}.{bronze_schema}.vendor_a_samples_raw LIMIT 5").display()
 
 # COMMAND ----------
 
@@ -112,16 +133,16 @@ display(df_bronze.limit(10))
 # MAGIC ### Bronze Layer Key Points
 # MAGIC
 # MAGIC Notice what we **did**:
-# MAGIC - ✅ Added `batch_id` for tracking which file this came from
-# MAGIC - ✅ Added `file_row_number` for row-level lineage
+# MAGIC - ✅ Loaded the data into a SQL-queryable table
+# MAGIC - ✅ Added metadata for tracking which file this came from and when it was loaded
 # MAGIC
 # MAGIC Notice what we **didn't do**:
 # MAGIC - ❌ Convert data types (everything is still strings)
-# MAGIC - ❌ Rename columns
+# MAGIC - ❌ Rename columns (including the Databricks-provided `_metadata` column)
 # MAGIC - ❌ Validate or clean values
 # MAGIC - ❌ Apply business logic
 # MAGIC
-# MAGIC Bronze is about **preservation**, not transformation.
+# MAGIC Bronze is about **preservation**, not transformation. We just add additional context so when someone's dashboard breaks downstream we can fully track the provenance of the data.
 
 # COMMAND ----------
 
@@ -131,34 +152,33 @@ display(df_bronze.limit(10))
 # MAGIC The silver layer applies **business logic**:
 # MAGIC - Convert string columns to proper types (dates, doubles)
 # MAGIC - Standardize column names for consistent querying
-# MAGIC - Preserve lineage (batch_id, file_row_number)
+# MAGIC - Preserve lineage (ingestion_id, file_row_number)
 # MAGIC
 # MAGIC This is where the data becomes **queryable and reliable**.
 
 # COMMAND ----------
 
-from pyspark.sql.types import DoubleType, DateType
+
 
 # Read from bronze
-df_bronze = spark.table(f"{catalog}.{bronze_schema}.vendor_samples_raw")
+df_bronze = spark.table(f"{catalog}.{bronze_schema}.vendor_a_samples_raw")
 
 # Apply transformations
 df_silver = (
     df_bronze
-    .select(
-        # Preserve lineage
-        F.col("batch_id"),
-        F.col("file_row_number"),
-
-        # Standardize column names and types
-        F.col("sample_barcode").alias("sample_id"),
-        F.col("lab_id"),
-        F.to_date(F.col("date_received"), "yyyy-MM-dd").alias("received_date"),
-        F.to_date(F.col("date_processed"), "yyyy-MM-dd").alias("processed_date"),
-        F.col("ph").cast(DoubleType()).alias("ph_value"),
-        F.col("copper_ppm").cast(DoubleType()).alias("copper_concentration_ppm"),
-        F.col("zinc_ppm").cast(DoubleType()).alias("zinc_concentration_ppm")
+    .withColumnsRenamed(
+        {
+            "_metadata": "databricks_ingestion_metadata",
+            "data_source": "vendor_name",
+        }
     )
+    # Parse dates
+    .withColumn("date_received", F.to_date(F.col("date_received"), "yyyy-MM-dd"))
+    .withColumn("date_processed", F.to_date(F.col("date_processed"), "yyyy-MM-dd"))
+    # Modify types
+    .withColumn("ph", F.col("ph").cast(DoubleType()))
+    .withColumn("copper_ppm", F.col("copper_ppm").cast(DoubleType()))
+    .withColumn("zinc_ppm", F.col("zinc_ppm").cast(DoubleType()))
     # Add processing timestamp
     .withColumn("silver_processed_at", F.current_timestamp())
 )
@@ -170,15 +190,14 @@ df_silver.printSchema()
 
 # Write to silver Delta table
 df_silver.write.format("delta").mode("overwrite").saveAsTable(
-    f"{catalog}.{silver_schema}.vendor_samples_cleaned"
+    f"{catalog}.{silver_schema}.vendor_a_samples_cleaned"
 )
 
 print(f"✓ Written to {catalog}.{silver_schema}.vendor_samples_cleaned")
 
 # COMMAND ----------
 
-# Display silver data
-display(df_silver.limit(10))
+spark.sql(f"SELECT * FROM {catalog}.{silver_schema}.vendor_a_samples_cleaned LIMIT 5").display()
 
 # COMMAND ----------
 
@@ -189,16 +208,23 @@ display(df_silver.limit(10))
 # MAGIC - ✅ Dates are actual `DateType` (not strings)
 # MAGIC - ✅ Measurements are `DoubleType` (not strings)
 # MAGIC - ✅ Column names are clear and consistent
-# MAGIC - ✅ Lineage preserved (`batch_id`, `file_row_number`)
+# MAGIC - ✅ Lineage preserved
+# MAGIC - ✅ Additional metadata added related to silver
+# MAGIC
+# MAGIC We could also further clean, validate, or standardize the data here as needed.
 # MAGIC
 # MAGIC This is the layer that **analysts query** for data exploration and reporting.
+# MAGIC
+# MAGIC What we haven't done:
+# MAGIC - ❌ Put the data into the exact format for report Y
+# MAGIC - ❌ Aggregated anything
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Gold Layer: Analytics-Ready Aggregations
 # MAGIC
-# MAGIC The gold layer delivers **pre-aggregated datasets** for specific use cases:
+# MAGIC The gold layer delivers **pre-processed datasets** for specific use cases:
 # MAGIC - Daily summaries by lab and date
 # MAGIC - Statistical aggregations (mean, stddev, min, max)
 # MAGIC - Optimized for dashboard queries
@@ -209,20 +235,21 @@ display(df_silver.limit(10))
 # COMMAND ----------
 
 # Read from silver
-df_silver = spark.table(f"{catalog}.{silver_schema}.vendor_samples_cleaned")
+df_silver = spark.table(f"{catalog}.{silver_schema}.vendor_a_samples_cleaned")
 
 # Create daily summary aggregations
 df_gold = (
     df_silver
-    .groupBy("received_date", "lab_id")
+    .withColumn("month_start", F.date_trunc("month", F.col("date_received")))
+    .groupBy("month_start", "vendor_name")
     .agg(
-        F.count("sample_id").alias("sample_count"),
-        F.avg("ph_value").alias("avg_ph"),
-        F.stddev("ph_value").alias("stddev_ph"),
-        F.min("ph_value").alias("min_ph"),
-        F.max("ph_value").alias("max_ph"),
-        F.avg("copper_concentration_ppm").alias("avg_copper_ppm"),
-        F.avg("zinc_concentration_ppm").alias("avg_zinc_ppm")
+        F.count("sample_barcode").alias("sample_count"),
+        F.avg("ph").alias("avg_ph"),
+        F.stddev("ph").alias("stddev_ph"),
+        F.min("ph").alias("min_ph"),
+        F.max("ph").alias("max_ph"),
+        F.avg("copper_ppm").alias("avg_copper_ppm"),
+        F.avg("zinc_ppm").alias("avg_zinc_ppm")
     )
     .withColumn("gold_processed_at", F.current_timestamp())
 )
@@ -232,17 +259,15 @@ df_gold.printSchema()
 
 # COMMAND ----------
 
-# Write to gold Delta table
 df_gold.write.format("delta").mode("overwrite").saveAsTable(
-    f"{catalog}.{gold_schema}.daily_sample_summary"
+    f"{catalog}.{gold_schema}.monthly_vendor_a_summary"
 )
 
-print(f"✓ Written to {catalog}.{gold_schema}.daily_sample_summary")
+print(f"✓ Written to {catalog}.{gold_schema}.monthly_vendor_a_summary")
 
 # COMMAND ----------
 
-# Display gold data
-display(df_gold.orderBy("received_date", "lab_id"))
+spark.sql(f"SELECT * FROM {catalog}.{gold_schema}.monthly_vendor_a_summary ORDER BY month_start").display()
 
 # COMMAND ----------
 
@@ -250,7 +275,7 @@ display(df_gold.orderBy("received_date", "lab_id"))
 # MAGIC ### Gold Layer Key Points
 # MAGIC
 # MAGIC The gold layer provides **fast access to common metrics**:
-# MAGIC - ✅ Daily summaries (no need to scan all samples)
+# MAGIC - ✅ Summaries (no need to scan all samples)
 # MAGIC - ✅ Statistical aggregations pre-calculated
 # MAGIC - ✅ Optimized for dashboard queries
 # MAGIC - ✅ Consistent metric definitions across reports

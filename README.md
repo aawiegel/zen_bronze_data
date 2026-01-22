@@ -69,16 +69,10 @@ This project uses **Databricks Asset Bundles** for easy deployment to Databricks
 #### Prerequisites
 
 1. **Databricks CLI** installed and configured:
-   ```bash
-   # Install Databricks CLI
-   pip install databricks-cli
-
-   # Configure authentication
-   databricks configure --token
-   ```
    You'll need:
-   - Workspace URL (e.g., `https://dbc-81f4a118-bb2c.cloud.databricks.com`)
-   - Personal Access Token (generate in User Settings → Access Tokens)
+   - Workspace URL (e.g., `https://YOUR-WORKSPACE-URL.cloud.databricks.com`)
+   - A personal access token
+   - Configure databricks dev profile with access token
 
 2. **Update workspace URL** in `databricks.yml`:
    ```yaml
@@ -95,47 +89,58 @@ This project uses **Databricks Asset Bundles** for easy deployment to Databricks
 databricks bundle validate
 
 # Deploy to your workspace
-databricks bundle deploy -t dev
+databricks bundle deploy
 
 # Verify deployment
-databricks bundle resources list -t dev
+databricks bundle resources list
 ```
 
 This will create:
-- **Schemas**: `workspace.bronze`, `workspace.silver`, `workspace.gold`
-- **Volume**: `workspace.bronze.incoming` (for CSV file storage)
+- **Schemas**: `workspace.dev_bronze`, `workspace.dev_silver`, `workspace.dev_gold`
+- **Volume**: `workspace.dev_bronze.incoming` (for CSV file storage)
 - **Job**: "Generate Sample CSV Files" (generates test data)
 
-#### Upload Sample Data
+#### Generate Sample Data
 
-Upload the example CSV files to the incoming volume:
+The bundle includes a job that generates all test data (clean files, messy files with typos, metadata rows, etc.):
 
+**Via CLI:**
 ```bash
-# Using Databricks CLI
-databricks fs cp example_data/vendor_a_basic_clean.csv \
-  dbfs:/Volumes/workspace/bronze/incoming/vendor_a_basic_clean.csv
-
-databricks fs cp example_data/vendor_b_standard_clean.csv \
-  dbfs:/Volumes/workspace/bronze/incoming/vendor_b_standard_clean.csv
+databricks jobs run-now --job-id $(databricks bundle resources list -t dev | grep generate_sample_files | awk '{print $2}')
 ```
 
-Or use the Databricks UI:
-1. Navigate to **Catalog** → **workspace** → **bronze** → **incoming**
-2. Click **Upload** and select your CSV files
+**Via UI:**
+1. Navigate to **Workflows** → "Generate Sample CSV Files"
+2. Click **Run Now**
+3. Wait for completion (generates ~10 vendor CSV files with various quality issues)
 
-#### Run the Notebooks
+This creates all necessary files in `/Volumes/workspace/bronze/incoming/`, including:
+- Clean vendor files (`vendor_a_basic_clean.csv`, `vendor_b_standard_clean.csv`)
+- Messy variants (typos, casing issues, whitespace problems)
+- Excel nightmares (metadata rows, empty padding columns)
+- Metadata tables (analyte dimensions, vendor-analyte mappings)
 
-1. **Generate Sample Files** (optional - creates messy test data):
-   ```bash
-   databricks jobs run-now --job-id $(databricks bundle resources list -t dev | grep generate_sample_files | awk '{print $2}')
-   ```
+**Alternative: Upload Example Files**
 
-   Or via UI: **Workflows** → "Generate Sample CSV Files" → **Run Now**
+If you want to use the pre-generated example data instead:
 
-2. **Medallion Demo Notebook**:
-   - Navigate to **Workspace** → your username → `.bundle/zen_bronze_data/dev/files/notebooks`
-   - Open `part1_medallion_demo.py`
-   - Attach to a cluster and **Run All**
+```bash
+# Upload the example CSV files to the incoming volume
+databricks fs cp example_data/vendor_a_basic_clean.csv \
+  dbfs:/Volumes/workspace/dev_bronze/incoming/vendor_a_basic_clean.csv
+
+databricks fs cp example_data/vendor_b_standard_clean.csv \
+  dbfs:/Volumes/workspace/dev_bronze/incoming/vendor_b_standard_clean.csv
+```
+
+#### Run the Demo Notebook
+
+Once data is generated:
+
+1. Navigate to **Workspace** → your username → `.bundle/zen_bronze_data/dev/files/notebooks`
+2. Open `part1_medallion_demo.py`
+3. Attach to a cluster or serverless compute (or create a new one)
+4. **Run All** to see Bronze → Silver → Gold in action!
 
 #### Destroy the Bundle (cleanup)
 

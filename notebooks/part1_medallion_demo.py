@@ -35,6 +35,8 @@ dbutils.widgets.text("silver_schema", "silver", "Silver Schema Name")
 dbutils.widgets.text("gold_schema", "gold", "Gold Schema Name")
 dbutils.widgets.text("incoming_volume", "incoming", "Incoming Volume Name")
 
+# COMMAND ----------
+
 catalog = dbutils.widgets.get("catalog")
 bronze_schema = dbutils.widgets.get("bronze_schema")
 silver_schema = dbutils.widgets.get("silver_schema")

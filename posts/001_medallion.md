@@ -8,7 +8,7 @@ This evolution represents genuine improvement, not just rebranding. Kimball's wa
 
 The pattern itself is straightforward. Bronze layers ingest raw data with minimal transformation, preserving source formats and tracking metadata about where data originated. Silver layers apply business logic, cleaning and standardizing data into queryable formats. Gold layers deliver analytics-ready datasets, pre-aggregated and optimized for dashboards and reports.
 
-![Medallion Architecture](Medallion.png)
+![Medallion Architecture](../Medallion.png)
 
 This series starts with the ideal case. Clean vendor files, stable schemas, cooperative data sources. We'll implement proper medallion architecture with metadata tracking and layer discipline. Then reality arrives. Post two explores what happens when vendors send chaos instead of clean CSVs; typos in headers, unstable schemas, Excel nightmares that make you question your career choices. Post three reveals an elegant solution that handles the chaos without drowning in vendor-specific transformation code.
 

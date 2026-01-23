@@ -56,7 +56,6 @@ print(f"File Path: {file_path}")
 
 # COMMAND ----------
 
-from datetime import datetime
 from uuid import uuid4
 
 from pyspark.sql import functions as F
@@ -93,6 +92,8 @@ df.limit(5).display()
 # MAGIC - `data_source`: Source of the data (in this case vendor A, but could be say SaaS database X)
 # MAGIC
 # MAGIC We could get more exhaustive than this (for example, including a pipeline code version hash from git), but we'll keep it simple for now.
+# MAGIC
+# MAGIC For simplicity, we embed metadata directly in the bronze table here. Production systems with high data volumes may benefit from separating ingestion metadata into its own audit table (referencing records via a batch ID) or using a data vault-style link table for more complex lineage. See the accompanying blog post for a discussion of these patterns.
 
 # COMMAND ----------
 

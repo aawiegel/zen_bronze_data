@@ -83,7 +83,9 @@ display(spark_df_clean.limit(5))
 # COMMAND ----------
 
 # Write to bronze
-spark_df_clean.write.format("delta").mode("overwrite").saveAsTable(f"{catalog}.{bronze_schema}.vendor_a_samples")
+spark_df_clean.write.format("delta").mode("overwrite").saveAsTable(
+    f"{catalog}.{bronze_schema}.vendor_a_samples"
+)
 
 print("✅ Bronze table created!")
 print("📊 Columns:", spark_df_clean.columns)
@@ -126,6 +128,7 @@ print("\n❌ They don't match! We need to standardize...")
 
 # COMMAND ----------
 
+
 # Create a column mapping function
 def standardize_vendor_b_columns(df):
     """Map Vendor B columns to standard names"""
@@ -138,6 +141,7 @@ def standardize_vendor_b_columns(df):
         F.col("cu_total").alias("copper_ppm"),  # Different name!
         F.col("zn_total").alias("zinc_ppm"),  # Different name!
     )
+
 
 spark_df_vendor_b_standardized = standardize_vendor_b_columns(spark_df_vendor_b)
 
@@ -182,7 +186,9 @@ print("❌ The schema changes based on what analyses were ordered!")
 # COMMAND ----------
 
 # Get the superset of all columns
-all_columns = list(set(spark_df_clean.columns) | set(spark_df_vendor_a_extended.columns))
+all_columns = list(
+    set(spark_df_clean.columns) | set(spark_df_vendor_a_extended.columns)
+)
 all_columns.sort()
 
 print(f"📊 Superset schema has {len(all_columns)} columns:")
@@ -194,7 +200,9 @@ for col in all_columns:
     if col not in spark_df_clean.columns:
         spark_df_clean = spark_df_clean.withColumn(col, F.lit(None).cast(StringType()))
     if col not in spark_df_vendor_a_extended.columns:
-        spark_df_vendor_a_extended = spark_df_vendor_a_extended.withColumn(col, F.lit(None).cast(StringType()))
+        spark_df_vendor_a_extended = spark_df_vendor_a_extended.withColumn(
+            col, F.lit(None).cast(StringType())
+        )
 
 # Reorder columns to match
 spark_df_clean_aligned = spark_df_clean.select(all_columns)
@@ -248,6 +256,7 @@ for col in spark_df_typos.columns:
 
 # COMMAND ----------
 
+
 def fix_typos(df):
     """Fix common typos in column names"""
     column_mapping = {}
@@ -256,9 +265,13 @@ def fix_typos(df):
         col_lower = col.lower()
         # Check for common typos
         if "recieved" in col_lower:  # received typo
-            column_mapping[col] = col.replace("recieved", "received").replace("reciev", "received")
+            column_mapping[col] = col.replace("recieved", "received").replace(
+                "reciev", "received"
+            )
         elif "proccessed" in col_lower:  # processed typo
-            column_mapping[col] = col.replace("proccessed", "processed").replace("proccess", "process")
+            column_mapping[col] = col.replace("proccessed", "processed").replace(
+                "proccess", "process"
+            )
         elif "sampl" in col_lower and "sample" not in col_lower:  # sample typo
             column_mapping[col] = col.replace("sampl", "sample")
         elif "barcod" in col_lower and "barcode" not in col_lower:  # barcode typo
@@ -266,7 +279,10 @@ def fix_typos(df):
         else:
             column_mapping[col] = col
 
-    return df.select([F.col(f"`{old}`").alias(new) for old, new in column_mapping.items()])
+    return df.select(
+        [F.col(f"`{old}`").alias(new) for old, new in column_mapping.items()]
+    )
+
 
 spark_df_typos_fixed = fix_typos(spark_df_typos)
 
@@ -289,16 +305,17 @@ print("📊 Fixed columns:", spark_df_typos_fixed.columns[:5])
 
 # Find the actual CSV file (Spark writes as directory with part files)
 import glob
+
 csv_files = glob.glob(f"{VOLUME_PATH}/vendor_a_basic_excel_nightmare.csv/*.csv")
 if csv_files:
     actual_file = csv_files[0]
     print("🔍 Raw CSV file (first 10 lines):")
     print("=" * 80)
-    with open(actual_file, 'r') as f:
+    with open(actual_file, "r") as f:
         for i, line in enumerate(f):
             if i >= 10:
                 break
-            print(f"{i+1:2d}: {repr(line.rstrip())}")
+            print(f"{i + 1:2d}: {repr(line.rstrip())}")
     print("=" * 80)
     print("\n😱 Notice:")
     print("  - Metadata rows at the top (Lab Report, Generated, etc.)")
@@ -334,6 +351,7 @@ display(spark_df_excel_nightmare.limit(5))
 
 # COMMAND ----------
 
+
 def detect_and_skip_metadata(df):
     """
     Detect metadata rows and skip to actual data
@@ -355,6 +373,7 @@ def detect_and_skip_metadata(df):
     print("⚠️ This is getting really hacky...")
     return df
 
+
 def remove_empty_columns(df):
     """Remove columns that are all null or empty string"""
     cols_to_keep = []
@@ -370,6 +389,7 @@ def remove_empty_columns(df):
                 cols_to_keep.append(col)
 
     return df.select([F.col(f"`{c}`") for c in cols_to_keep])
+
 
 detect_and_skip_metadata(spark_df_excel_nightmare)
 spark_df_excel_cleaned = remove_empty_columns(spark_df_excel_nightmare)
@@ -404,6 +424,7 @@ for col in spark_df_db_nightmare.columns:
 
 # COMMAND ----------
 
+
 def sanitize_db_chars(df):
     """Remove invalid database characters from column names"""
     column_mapping = {}
@@ -413,7 +434,10 @@ def sanitize_db_chars(df):
         new_col = col.replace("#", "").replace("%", "_pct").replace("-", "_")
         column_mapping[col] = new_col
 
-    return df.select([F.col(f"`{old}`").alias(new) for old, new in column_mapping.items()])
+    return df.select(
+        [F.col(f"`{old}`").alias(new) for old, new in column_mapping.items()]
+    )
+
 
 spark_df_db_sanitized = sanitize_db_chars(spark_df_db_nightmare)
 
@@ -434,6 +458,7 @@ print("📊 Sanitized columns:", spark_df_db_sanitized.columns[:8])
 # MAGIC ### The Bronze Layer Pipeline (Final Form)
 
 # COMMAND ----------
+
 
 # NOTE: This is for illustration only - not actually running this code
 def load_vendor_to_bronze(file_path, vendor_name, analysis_package):
@@ -466,9 +491,12 @@ def load_vendor_to_bronze(file_path, vendor_name, analysis_package):
     # ... and so on for each new vendor
 
     # Step 8: Write to bronze
-    df.write.format("delta").mode("append").option("mergeSchema", "true").saveAsTable("bronze.lab_samples")
+    df.write.format("delta").mode("append").option("mergeSchema", "true").saveAsTable(
+        "bronze.lab_samples"
+    )
 
     return df
+
 
 print("😰 Look at all those steps... and this is supposed to be 'just load the data'?!")
 
@@ -539,6 +567,7 @@ print("😰 Look at all those steps... and this is supposed to be 'just load the
 import csv
 from typing import Any
 
+
 class CSVTableParser:
     """Parse CSV files and unpivot to long format"""
 
@@ -548,14 +577,15 @@ class CSVTableParser:
     def parse(self, file_path: str) -> list[dict[str, Any]]:
         """Main entry point: read CSV, clean, and unpivot"""
         # Step 1: Read the CSV file
-        with open(file_path, "r", encoding=self.config.get("encoding", "utf-8")) as file:
+        with open(
+            file_path, "r", encoding=self.config.get("encoding", "utf-8")
+        ) as file:
             reader = csv.reader(file)
             records = [[val if val else None for val in row] for row in reader]
 
         # Step 2: Remove metadata rows and find the real header
         records = self.remove_header(
-            records,
-            min_found=self.config.get("header_detection_threshold", 10)
+            records, min_found=self.config.get("header_detection_threshold", 10)
         )
 
         # Step 3: Clean up column names (remove empty columns, deduplicate)
@@ -602,13 +632,16 @@ class CSVTableParser:
         result = []
         for row_idx, row in enumerate(records[1:], start=1):
             for col_idx, (attribute, value) in enumerate(zip(header, row), start=1):
-                result.append({
-                    "row_index": row_idx,
-                    "column_index": col_idx,
-                    "lab_provided_attribute": attribute,  # Keep original name!
-                    "lab_provided_value": value,
-                })
+                result.append(
+                    {
+                        "row_index": row_idx,
+                        "column_index": col_idx,
+                        "lab_provided_attribute": attribute,  # Keep original name!
+                        "lab_provided_value": value,
+                    }
+                )
         return result
+
 
 print("✨ Key features:")
 print("  - Uses standard csv module (not pandas/spark)")
@@ -636,6 +669,7 @@ print("  - Tracks row/column position for traceability")
 
 import glob
 
+
 # Helper function to find the actual CSV file in Databricks directory structure
 def get_csv_file_path(base_path: str) -> str:
     """
@@ -647,6 +681,7 @@ def get_csv_file_path(base_path: str) -> str:
         return csv_files[0]
     else:
         raise FileNotFoundError(f"No CSV file found in {base_path}")
+
 
 # Use our CSV parser to unpivot the messy file
 parser = CSVTableParser({"header_detection_threshold": 5})
@@ -710,16 +745,15 @@ display(spark_analyte_dim.limit(10))
 
 # Join unpivoted data with mapping, then with analyte dimension
 spark_df_standardized = (
-    spark_df_unpivoted
-    .join(
+    spark_df_unpivoted.join(
         spark_mapping,
         (spark_df_unpivoted.lab_provided_attribute == spark_mapping.vendor_column_name),
-        "left"
+        "left",
     )
     .join(
         spark_analyte_dim,
         spark_mapping.analyte_id == spark_analyte_dim.analyte_id,
-        "left"
+        "left",
     )
     .select(
         "row_index",
@@ -729,7 +763,7 @@ spark_df_standardized = (
         spark_analyte_dim.analyte_id,
         spark_analyte_dim.analyte_name,
         spark_analyte_dim.data_type,
-        spark_analyte_dim.unit
+        spark_analyte_dim.unit,
     )
 )
 
@@ -744,22 +778,26 @@ display(spark_df_standardized.filter(F.col("analyte_name").isNotNull()).limit(10
 # COMMAND ----------
 
 # Parse Vendor B's messy file (totally different schema!)
-csv_file_path_vendor_b = get_csv_file_path(f"{VOLUME_PATH}/vendor_b_full_excel_disaster.csv")
+csv_file_path_vendor_b = get_csv_file_path(
+    f"{VOLUME_PATH}/vendor_b_full_excel_disaster.csv"
+)
 records_vendor_b = parser.parse(csv_file_path_vendor_b)
 spark_df_vendor_b_unpivoted = spark.createDataFrame(records_vendor_b)
 
 # Same join logic works!
 spark_df_vendor_b_standardized = (
-    spark_df_vendor_b_unpivoted
-    .join(
+    spark_df_vendor_b_unpivoted.join(
         spark_mapping,
-        (spark_df_vendor_b_unpivoted.lab_provided_attribute == spark_mapping.vendor_column_name),
-        "left"
+        (
+            spark_df_vendor_b_unpivoted.lab_provided_attribute
+            == spark_mapping.vendor_column_name
+        ),
+        "left",
     )
     .join(
         spark_analyte_dim,
         spark_mapping.analyte_id == spark_analyte_dim.analyte_id,
-        "left"
+        "left",
     )
     .select(
         "row_index",
@@ -769,12 +807,14 @@ spark_df_vendor_b_standardized = (
         spark_analyte_dim.analyte_id,
         spark_analyte_dim.analyte_name,
         spark_analyte_dim.data_type,
-        spark_analyte_dim.unit
+        spark_analyte_dim.unit,
     )
 )
 
 print("✨ Vendor B standardized with THE SAME CODE:")
-display(spark_df_vendor_b_standardized.filter(F.col("analyte_name").isNotNull()).limit(10))
+display(
+    spark_df_vendor_b_standardized.filter(F.col("analyte_name").isNotNull()).limit(10)
+)
 
 # COMMAND ----------
 
@@ -831,6 +871,7 @@ display(spark_df_vendor_b_standardized.filter(F.col("analyte_name").isNotNull())
 
 # COMMAND ----------
 
+
 # NOTE: This is for illustration only - not actually running this code
 def load_vendor_to_bronze(file_path):
     """
@@ -843,11 +884,10 @@ def load_vendor_to_bronze(file_path):
     df = spark.createDataFrame(records)
 
     # Write to bronze
-    df.write.format("delta").mode("append").saveAsTable(
-        "bronze.lab_samples_unpivoted"
-    )
+    df.write.format("delta").mode("append").saveAsTable("bronze.lab_samples_unpivoted")
 
     return df
+
 
 print("✨ That's it. Same code for ALL vendors. 🎉")
 
@@ -875,6 +915,7 @@ print("✨ That's it. Same code for ALL vendors. 🎉")
 
 # COMMAND ----------
 
+
 # NOTE: This is for illustration only - not actually running this code
 def bronze_to_silver():
     """
@@ -887,7 +928,7 @@ def bronze_to_silver():
     silver_df = bronze_df.join(
         mapping_df,
         bronze_df.lab_provided_attribute == mapping_df.vendor_column_name,
-        "left"
+        "left",
     )
 
     # Apply business rules (data type conversion, validation, etc.)
@@ -895,11 +936,12 @@ def bronze_to_silver():
         "numeric_value",
         F.when(
             F.col("analyte_data_type") == "numeric",
-            F.col("lab_provided_value").cast("double")
-        )
+            F.col("lab_provided_value").cast("double"),
+        ),
     )
 
     return silver_df
+
 
 print("✨ Clean, testable, maintainable.")
 
@@ -986,7 +1028,7 @@ print("✨ Clean, testable, maintainable.")
 # MAGIC    - Did the value parse successfully?
 # MAGIC    - Was the column mapped to a known analyte?
 # MAGIC    - Were there any warnings during parsing?
-# MAGIC    - Data profiling / monitoring (e.g., we can see exactly how unstable the provided attributes are for each vendor!)    
+# MAGIC    - Data profiling / monitoring (e.g., we can see exactly how unstable the provided attributes are for each vendor!)
 # MAGIC
 # MAGIC 4. **Incremental loading**
 # MAGIC    - How do you avoid re-processing files?
@@ -1064,5 +1106,3 @@ print("✨ Clean, testable, maintainable.")
 # MAGIC I'd love to hear them!
 
 # COMMAND ----------
-
-

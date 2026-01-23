@@ -19,17 +19,13 @@ def test_parse_csv_with_metadata_rows():
     gen = np.random.default_rng(42)
 
     # Generate a clean vendor CSV
-    df = vendors.forge_vendor_csv(
-        gen, vendor="vendor_a", packages=["basic"], rows=10
-    )
+    df = vendors.forge_vendor_csv(gen, vendor="vendor_a", packages=["basic"], rows=10)
 
     # Add metadata rows at the top
     df_chaos = chaos.chaos_metadata_rows(gen, df, num_rows=3)
 
     # Write to temporary CSV file
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".csv", delete=False
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
         df_chaos.to_csv(f, index=False)
         temp_path = f.name
 
@@ -69,9 +65,7 @@ def test_parse_csv_with_empty_padding_columns():
     df_chaos = chaos.chaos_empty_column_padding(gen, df, num_columns=3)
 
     # Write to temporary CSV file
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".csv", delete=False
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
         df_chaos.to_csv(f, index=False)
         temp_path = f.name
 
@@ -113,9 +107,7 @@ def test_parse_csv_with_header_chaos():
     )
 
     # Write to temporary CSV file
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".csv", delete=False
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
         df_chaos.to_csv(f, index=False)
         temp_path = f.name
 
@@ -163,9 +155,7 @@ def test_parse_csv_with_all_chaos_features():
     )
 
     # Write to temporary CSV file
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".csv", delete=False
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
         df_chaos.to_csv(f, index=False)
         temp_path = f.name
 
@@ -196,9 +186,7 @@ def test_parse_csv_roundtrip_data_integrity():
     gen = np.random.default_rng(456)
 
     # Generate a simple vendor CSV with known values
-    df = vendors.forge_vendor_csv(
-        gen, vendor="vendor_a", packages=["basic"], rows=5
-    )
+    df = vendors.forge_vendor_csv(gen, vendor="vendor_a", packages=["basic"], rows=5)
 
     # Store original sample_barcode values (first column)
     original_barcodes = df["sample_barcode"].tolist()
@@ -213,9 +201,7 @@ def test_parse_csv_roundtrip_data_integrity():
     )
 
     # Write to temporary CSV file
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".csv", delete=False
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
         df_chaos.to_csv(f, index=False)
         temp_path = f.name
 
@@ -227,9 +213,7 @@ def test_parse_csv_roundtrip_data_integrity():
         # Extract barcode values from parsed data
         # Find records where the attribute contains "barco" (might have typos!)
         barcode_records = [
-            r
-            for r in records
-            if "barco" in r["lab_provided_attribute"].lower()
+            r for r in records if "barco" in r["lab_provided_attribute"].lower()
         ]
 
         # Should have 5 barcode values
@@ -250,9 +234,7 @@ def test_parse_csv_with_empty_string_padding_cleaned():
     gen = np.random.default_rng(789)
 
     # Generate vendor CSV
-    df = vendors.forge_vendor_csv(
-        gen, vendor="vendor_a", packages=["basic"], rows=5
-    )
+    df = vendors.forge_vendor_csv(gen, vendor="vendor_a", packages=["basic"], rows=5)
 
     # Count original columns
     original_col_count = len(df.columns)
@@ -264,9 +246,7 @@ def test_parse_csv_with_empty_string_padding_cleaned():
     assert len(df_chaos.columns) == original_col_count + 2
 
     # Write to temporary CSV file
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".csv", delete=False
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
         df_chaos.to_csv(f, index=False)
         temp_path = f.name
 
@@ -283,7 +263,10 @@ def test_parse_csv_with_empty_string_padding_cleaned():
 
         # Empty string columns should be cleaned out by parser
         # We should only have the original non-empty column names
-        assert "" not in attributes or len([a for a in attributes if a]) >= original_col_count
+        assert (
+            "" not in attributes
+            or len([a for a in attributes if a]) >= original_col_count
+        )
 
     finally:
         os.unlink(temp_path)

@@ -57,7 +57,6 @@ def forge_barcode(
     )
 
     if placeholder_location is not None:
-
         insert_pos = placeholder_location - prefix_len
         if 0 <= insert_pos <= len(random_part):
             random_part = (

@@ -209,3 +209,5 @@ __marimo__/
 .databricks
 
 .vscode
+
+.context

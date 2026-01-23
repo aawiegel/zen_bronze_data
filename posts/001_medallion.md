@@ -43,9 +43,9 @@ Enough concepts. Let's implement this with actual code and actual data. We'll wo
 
 ## The Use Case
 
-Biotech companies frequently work with contract research organizations to perform specialized laboratory measurements. These external labs analyze samples and return results as CSV or Excel files. Each vendor has their own file format, column naming conventions, and data delivery schedules. Our task is to ingest this vendor data and make it available for analysis while maintaining data quality and traceability.
+Biotech companies frequently work with contract research organizations to perform specialized laboratory measurements. These external labs analyze samples and return results as CSV or Excel files. Each vendor has their own file format, column naming conventions, and data delivery schedules. Our task is to ingest this vendor data and make it available for analysis while maintaining data quality and traceability. You can follow along with a Databricks notebook on Github [here](https://github.com/aawiegel/zen_bronze_data/blob/feature/bronze_blog_series/notebooks/001_medallion_demo.py).
 
-Our scenario involves a soil chemistry lab that measures pH levels and heavy metal concentrations. They send results as CSV files with one row per sample. Each file contains sample identifiers, lab batch information, collection and processing dates, and measurement results. For this first post, we're working with the ideal case: clean data, stable schema, consistent formatting.
+Our scenario involves a soil chemistry lab that measures pH levels and metal concentrations. They send results as CSV files with one row per sample. Each file contains sample identifiers, lab batch information, collection and processing dates, and measurement results. For this first post, we're working with the ideal case: clean data, stable schema, consistent formatting.
 
 Here's what the vendor file looks like:
 ```csv

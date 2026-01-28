@@ -236,8 +236,14 @@ for file_config in files_to_generate:
     output_path = f"{VOLUME_PATH}/{file_config['filename']}"
 
     # Convert DataFrame to Spark DataFrame and write
+    # If metadata rows were added, the DataFrame has integer column names
+    # and we should write without header (header is now a data row)
+    chaos_config = file_config.get("chaos_config", {})
+    has_metadata = chaos_config.get("add_metadata_rows", False)
+    header_option = "false" if has_metadata else "true"
+
     spark_df = spark.createDataFrame(df)
-    spark_df.coalesce(1).write.mode("overwrite").option("header", "true").csv(
+    spark_df.coalesce(1).write.mode("overwrite").option("header", header_option).csv(
         output_path
     )
 

@@ -186,21 +186,32 @@ def chaos_metadata_rows(
     - "Contact: lab@example.com"
     - Empty rows before the actual data header
 
+    IMPORTANT: This function converts the original DataFrame's column names into
+    a data row, then creates a new DataFrame with generic integer column names
+    (0, 1, 2, ...). This ensures that when written to CSV with header=False,
+    the structure is:
+      - Metadata rows (first)
+      - Original column names as a data row (middle)
+      - Original data rows (last)
+
     Args:
         generator: numpy random generator
         df: Input DataFrame
         num_rows: Number of metadata rows to add (if None, randomly choose 1-4)
 
     Returns:
-        DataFrame with metadata rows prepended
+        DataFrame with integer column names, containing:
+        - num_rows metadata rows
+        - 1 row with original column names as data
+        - len(df) rows with original data
 
     Example:
         >>> gen = np.random.default_rng(42)
         >>> df = pd.DataFrame({"sample_id": [1, 2], "ph": [6.5, 7.0]})
         >>> df_chaos = chaos_metadata_rows(gen, df, num_rows=2)
-        >>> # First 2 rows might be: ["Report Date: 2024-10-15", "", ...] and ["", "", ...]
+        >>> # df_chaos has columns [0, 1] and 5 rows (2 metadata + 1 header + 2 data)
+        >>> # Write to CSV with: df_chaos.to_csv("file.csv", index=False, header=False)
     """
-    import numpy as np
 
     if num_rows is None:
         num_rows = generator.integers(1, 5)  # Random 1-4 metadata rows
@@ -229,11 +240,18 @@ def chaos_metadata_rows(
             base_row = base_row[: len(df.columns)]
         metadata_rows.append(base_row)
 
-    # Create DataFrame from metadata rows
-    metadata_df = pd.DataFrame(metadata_rows, columns=df.columns)
+    # Convert original column names to a data row
+    header_row = list(df.columns)
 
-    # Concatenate metadata rows on top of the original DataFrame
-    result = pd.concat([metadata_df, df], ignore_index=True)
+    # Get original data as list of lists
+    data_rows = df.values.tolist()
+
+    # Combine: metadata rows + header as data + original data
+    all_rows = metadata_rows + [header_row] + data_rows
+
+    # Create new DataFrame with generic integer column names
+    # When written to CSV with header=False, this produces metadata → header → data structure
+    result = pd.DataFrame(all_rows)
 
     return result
 
@@ -261,7 +279,6 @@ def chaos_empty_column_padding(
         >>> df_chaos = chaos_empty_column_padding(gen, df, num_columns=2)
         >>> # Adds 2 columns with "" as column name, all values empty strings
     """
-    import numpy as np
 
     if num_columns is None:
         num_columns = generator.integers(1, 4)  # Random 1-3 empty columns
@@ -324,11 +341,7 @@ def apply_chaos(
         >>> # Now df_messy has: typos, inconsistent casing, whitespace,
         >>> # metadata rows at top, AND empty padding columns!
     """
-    # Apply metadata rows FIRST (before header chaos) so the chaos affects metadata too
-    if add_metadata_rows:
-        df = chaos_metadata_rows(generator, df, num_rows=num_metadata)
-
-    # Apply header chaos transformations
+    # Apply header chaos transformations FIRST (while columns are still strings)
     if header_typos > 0:
         df = chaos_header_typos(generator, df, probability=header_typos)
     if header_casing > 0:
@@ -338,8 +351,13 @@ def apply_chaos(
     if invalid_db_chars > 0:
         df = chaos_invalid_db_chars(generator, df, probability=invalid_db_chars)
 
-    # Add empty column padding
+    # Add empty column padding (still works with string column names)
     if add_empty_padding:
         df = chaos_empty_column_padding(generator, df, num_columns=num_empty)
+
+    # Apply metadata rows LAST (converts column names to integers)
+    # This must be last because it changes the DataFrame structure fundamentally
+    if add_metadata_rows:
+        df = chaos_metadata_rows(generator, df, num_rows=num_metadata)
 
     return df

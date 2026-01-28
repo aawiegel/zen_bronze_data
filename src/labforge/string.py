@@ -2,12 +2,6 @@
 Module for "forging" data for demonstration purposes
 """
 
-import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
-import random
-import string
-
 
 def forge_barcode(
     generator,

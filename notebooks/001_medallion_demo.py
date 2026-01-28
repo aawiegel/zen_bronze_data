@@ -46,7 +46,9 @@ gold_schema = dbutils.widgets.get("gold_schema")
 incoming_volume = dbutils.widgets.get("incoming_volume")
 
 # Construct file path
-file_path = f"/Volumes/{catalog}/{bronze_schema}/{incoming_volume}/vendor_a_basic_clean.csv"
+file_path = (
+    f"/Volumes/{catalog}/{bronze_schema}/{incoming_volume}/vendor_a_basic_clean.csv"
+)
 
 print(f"Catalog: {catalog}")
 print(f"Bronze Schema: {bronze_schema}")
@@ -104,7 +106,6 @@ df_bronze = (
     .withColumn("source_file_path", F.col("_metadata.file_path"))
     .withColumn("source_file_name", F.col("_metadata.file_name"))
     .withColumn("file_modified_at", F.col("_metadata.file_modification_time"))
-    
     # Add our business metadata
     .withColumn("ingestion_id", F.lit(str(uuid4())))
     .withColumn("data_source", F.lit("vendor_a"))
@@ -128,7 +129,9 @@ print(f"✓ Written to {catalog}.{bronze_schema}.vendor_a_samples_raw")
 
 # COMMAND ----------
 
-spark.sql(f"SELECT * FROM {catalog}.{bronze_schema}.vendor_a_samples_raw LIMIT 5").display()
+spark.sql(
+    f"SELECT * FROM {catalog}.{bronze_schema}.vendor_a_samples_raw LIMIT 5"
+).display()
 
 # COMMAND ----------
 
@@ -162,14 +165,12 @@ spark.sql(f"SELECT * FROM {catalog}.{bronze_schema}.vendor_a_samples_raw LIMIT 5
 # COMMAND ----------
 
 
-
 # Read from bronze
 df_bronze = spark.table(f"{catalog}.{bronze_schema}.vendor_a_samples_raw")
 
 # Apply transformations
 df_silver = (
-    df_bronze
-    .withColumnsRenamed(
+    df_bronze.withColumnsRenamed(
         {
             "_metadata": "databricks_ingestion_metadata",
             "data_source": "vendor_name",
@@ -200,7 +201,9 @@ print(f"✓ Written to {catalog}.{silver_schema}.vendor_samples_cleaned")
 
 # COMMAND ----------
 
-spark.sql(f"SELECT * FROM {catalog}.{silver_schema}.vendor_a_samples_cleaned LIMIT 5").display()
+spark.sql(
+    f"SELECT * FROM {catalog}.{silver_schema}.vendor_a_samples_cleaned LIMIT 5"
+).display()
 
 # COMMAND ----------
 
@@ -242,8 +245,7 @@ df_silver = spark.table(f"{catalog}.{silver_schema}.vendor_a_samples_cleaned")
 
 # Create daily summary aggregations
 df_gold = (
-    df_silver
-    .withColumn("month_start", F.date_trunc("month", F.col("date_received")))
+    df_silver.withColumn("month_start", F.date_trunc("month", F.col("date_received")))
     .groupBy("month_start", "vendor_name")
     .agg(
         F.count("sample_barcode").alias("sample_count"),
@@ -252,7 +254,7 @@ df_gold = (
         F.min("ph").alias("min_ph"),
         F.max("ph").alias("max_ph"),
         F.avg("copper_ppm").alias("avg_copper_ppm"),
-        F.avg("zinc_ppm").alias("avg_zinc_ppm")
+        F.avg("zinc_ppm").alias("avg_zinc_ppm"),
     )
     .withColumn("gold_processed_at", F.current_timestamp())
 )
@@ -270,7 +272,9 @@ print(f"✓ Written to {catalog}.{gold_schema}.monthly_vendor_a_summary")
 
 # COMMAND ----------
 
-spark.sql(f"SELECT * FROM {catalog}.{gold_schema}.monthly_vendor_a_summary ORDER BY month_start").display()
+spark.sql(
+    f"SELECT * FROM {catalog}.{gold_schema}.monthly_vendor_a_summary ORDER BY month_start"
+).display()
 
 # COMMAND ----------
 
@@ -314,7 +318,9 @@ spark.sql(f"SELECT * FROM {catalog}.{gold_schema}.monthly_vendor_a_summary ORDER
 # COMMAND ----------
 
 # Peek at Vendor B's file
-vendor_b_path = f"/Volumes/{catalog}/{bronze_schema}/{incoming_volume}/vendor_b_standard_clean.csv"
+vendor_b_path = (
+    f"/Volumes/{catalog}/{bronze_schema}/{incoming_volume}/vendor_b_standard_clean.csv"
+)
 df_vendor_b = spark.read.option("header", "true").csv(vendor_b_path)
 
 print("Vendor B schema:")

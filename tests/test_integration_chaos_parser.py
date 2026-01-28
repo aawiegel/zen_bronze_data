@@ -8,7 +8,6 @@ can be successfully parsed by the CSVTableParser.
 import tempfile
 import os
 import numpy as np
-import pandas as pd
 
 from src.labforge import vendors, chaos
 from src.parse import CSVTableParser
@@ -25,8 +24,9 @@ def test_parse_csv_with_metadata_rows():
     df_chaos = chaos.chaos_metadata_rows(gen, df, num_rows=3)
 
     # Write to temporary CSV file
+    # chaos_metadata_rows() converts columns to integers, so write with header=False
     with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
-        df_chaos.to_csv(f, index=False)
+        df_chaos.to_csv(f, index=False, header=False)
         temp_path = f.name
 
     try:
@@ -38,9 +38,9 @@ def test_parse_csv_with_metadata_rows():
         assert len(records) > 0
 
         # Should have unpivoted the data (each cell becomes a row)
-        # Original data: 10 rows × ~9 columns = ~90 cells
-        # We should have at least that many records (metadata adds more)
-        assert len(records) >= 90
+        # Original data: 10 rows × 7 columns (vendor_a basic package) = 70 cells
+        # Metadata rows are skipped by header detection, not included in output
+        assert len(records) >= 70
 
         # Check structure
         assert "row_index" in records[0]
@@ -155,8 +155,9 @@ def test_parse_csv_with_all_chaos_features():
     )
 
     # Write to temporary CSV file
+    # Metadata rows were added, so write with header=False
     with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
-        df_chaos.to_csv(f, index=False)
+        df_chaos.to_csv(f, index=False, header=False)
         temp_path = f.name
 
     try:

@@ -10,13 +10,13 @@ Traditional thinking treats CSV column names as schema constraints. You design a
 
 Each vendor variation becomes a code problem requiring a code solution.
 
-Consider what happens as this approach scales. With two vendors and two analysis packages each, you manage four schema mappings. Add a third vendor with three packages, and you're at nine. The combination space grows faster than the vendor count. Testing requires sample files for every vendor/package/quirk combination; the test matrix explodes exponentially.
+Consider what happens as this approach scales. With two vendors and two analysis packages each, you manage four schema mappings. Add a third vendor with three packages, and you're at nine. The combination space grows faster than the vendor count (combinatorial explosions being a data engineer's favorite kind of surprise). Testing requires sample files for every vendor/package/quirk combination; the test matrix explodes exponentially.
 
 The fundamental issue is treating column names as structural constraints when they're actually metadata about measurements.
 
 ## What "Raw" Actually Means
 
-When vendors send CSV files, they're dumping data from lab systems or Excel into whatever format was easiest to export. The wide CSV format (one column per measurement) is convenient for humans viewing spreadsheets, but it creates a problem: semantics are encoded in structure.
+When vendors send CSV files, they're dumping data from lab systems or Excel into whatever format was easiest to export. The wide CSV format (one column per measurement) is convenient for humans viewing spreadsheets (and data engineers pretending vendor files arrive in thoughtful formats), but it creates a problem: semantics are encoded in structure.
 
 Consider what this means in practice. Column positions and names carry meaning; you need to know that the third column represents copper measurements before you can interpret the value 10.2. This encoding is precisely what created the brittleness we fought in Part 2.
 
@@ -52,7 +52,7 @@ This transformation is called unpivoting (or melting). It converts wide format i
 
 ## The Power of Vendor-Agnostic Structure
 
-This pattern isn't novel; it's a variant of the Entity-Attribute-Value (EAV) model that's been used in database design for decades, particularly in healthcare and scientific domains where schemas are highly variable. In simpler terms, we're storing key-value pairs with position metadata. The statistical community calls this "long format" or "tidy data"; database architects call it "vertical storage." The concept is well-established; what's perhaps less common is applying it specifically to bronze layer ingestion as a solution to vendor schema chaos.
+This pattern isn't novel; it's a variant of the Entity-Attribute-Value (EAV) model that's been used in database design for decades, particularly in healthcare and scientific domains where schemas are highly variable. In simpler terms, we're storing key-value pairs with position metadata. The statistical community calls this "long format" or "tidy data"; database architects call it "vertical storage." The concept is well-established (data engineers have been independently "discovering" EAV for years, always convinced this time it's definitely different). What's perhaps less common is applying it specifically to bronze layer ingestion as a solution to vendor schema chaos.
 
 Once data is in long format, the bronze table schema becomes fixed and vendor-agnostic:
 
@@ -111,7 +111,7 @@ def remove_header(self, records: list[list[Any]], min_found: int = 10) -> list[l
 
 The threshold (`min_found`) is configurable, not embedded in code. If Vendor A typically has 15 columns and Vendor B has 8, you can initialize the parser with different thresholds: `CSVTableParser({"header_detection_threshold": 15})` for Vendor A and `CSVTableParser({"header_detection_threshold": 7})` for Vendor B. This is configuration data, not branching logic. The algorithm remains the same; only the parameter changes.
 
-Contrast this with Part 2's approach, where header detection logic might have vendor-specific if/elif branches checking for patterns like "Lab Report Generated" (Vendor A's metadata format) versus "Analysis Date" (Vendor B's format). Configurable thresholds let you adapt to vendor differences without encoding vendor knowledge into the codebase.
+Contrast this with Part 2's approach, where header detection logic might have vendor-specific if/elif branches checking for patterns like "Lab Report Generated" (Vendor A's metadata format) versus "Analysis Date" (Vendor B's format). Configurable thresholds let you adapt to vendor differences without encoding vendor knowledge into the codebase (though you still need to know the magic number; we've just moved where that knowledge lives).
 
 ### Cleaning Column Structure
 
@@ -206,46 +206,48 @@ This same loop processes 11 different vendor files:
 
 No vendor-specific branches. No analysis package logic. No special handling for typos or special characters. The parser treats every file identically; the bronze layer preserves everything as data.
 
-Compare this to the eight-step bronze function from Part 2 with its vendor-specific mappings, superset schema alignment, fuzzy matching, and character sanitization. The unpivot approach collapses all that complexity into a single generic transformation.
+Compare this to the eight-step bronze function from Part 2 with its vendor-specific mappings, superset schema alignment, fuzzy matching, and character sanitization. The unpivot approach collapses all that complexity into a single generic transformation. What took eight carefully orchestrated steps now takes one aggressively indifferent loop.
 
 ## Silver Layer: Standardization Through Data
 
 Bronze preserves chaos; silver brings order. The key insight is that standardization happens through data (mapping tables), not code (if/elif logic).
 
-The unpivoted bronze table contains `lab_provided_attribute` values like "ph", "acidity", "copper_ppm", "cu_total". These mean different things structurally (they're different column names) but the same thing semantically (pH and copper measurements). The silver layer resolves this semantic ambiguity through two tables: vendor-analyte mapping and analyte dimension.
+The unpivoted bronze table contains `lab_provided_attribute` values like "ph", "acidity", "copper_ppm", "cu_total", "sample_barcode", "sample_barcod" (typo), "lab_id". These need standardization regardless of whether they're measurements or metadata columns. The silver layer resolves this through a unified mapping approach.
 
-### Vendor-Analyte Mapping Table
+### Vendor Column Mapping Table
 
-This [mapping table](../src/labforge/metadata.py) connects vendor-specific column names to canonical analyte identifiers:
+This [mapping table](../src/labforge/metadata.py) connects vendor-specific column names to canonical column identifiers:
 
-| vendor_id | vendor_column_name | analyte_id | notes |
-|-----------|-------------------|------------|-------|
-| vendor_a  | ph                | a94a8fe5   | Direct pH measurement |
-| vendor_a  | copper_ppm        | f1e2d3c4   | Copper reported in ppm |
-| vendor_b  | acidity           | a94a8fe5   | pH reported as 'acidity' |
-| vendor_b  | cu_total          | f1e2d3c4   | Total copper using chemical symbol |
+| vendor_id | vendor_column_name | canonical_column_id | notes |
+|-----------|-------------------|---------------------|-------|
+| vendor_a  | ph                | col_ph              | Direct pH measurement |
+| vendor_a  | copper_ppm        | col_copper          | Copper in ppm |
+| vendor_b  | acidity           | col_ph              | Vendor B calls pH 'acidity' |
+| vendor_b  | cu_total          | col_copper          | Chemical symbol notation |
+| vendor_a  | sample_barcode    | col_sample_id       | Sample identifier |
+| vendor_b  | sample_barcod     | col_sample_id       | Typo preserved in bronze |
 
-Notice that "ph" and "acidity" both map to the same `analyte_id` (a94a8fe5). The mapping table captures domain knowledge: despite different names, both columns represent pH measurements. Similarly, "copper_ppm" and "cu_total" share analyte_id f1e2d3c4.
+Notice that "ph" and "acidity" both map to `col_ph`. Similarly, "sample_barcode" and "sample_barcod" (typo) both map to `col_sample_id`. The mapping handles both measurements and metadata columns uniformly.
 
-This is configuration data, not logic. When Vendor C arrives calling pH "pH_level", you add a row to the mapping table. No code changes required.
+### Canonical Column Definitions
 
-### Analyte Dimension Table
+The silver staging area maintains simple canonical definitions for all columns:
 
-The analyte dimension provides canonical metadata about each measurement:
+| canonical_column_id | canonical_column_name | column_category    | data_type | description |
+|--------------------|----------------------|-------------------|-----------|-------------|
+| col_ph             | ph                   | measurement       | numeric   | Soil pH level |
+| col_copper         | copper_ppm           | measurement       | numeric   | Copper concentration |
+| col_sample_id      | sample_barcode       | sample_identifier | string    | Unique sample ID |
+| col_lab_id         | lab_id               | lab_metadata      | string    | Laboratory identifier |
+| col_date_received  | date_received        | date              | date      | Sample receipt date |
 
-| analyte_id | analyte_name | unit | data_type | min_valid_value | max_valid_value |
-|-----------|--------------|------|-----------|----------------|-----------------|
-| a94a8fe5  | pH           |      | numeric   | 0.0            | 14.0            |
-| f1e2d3c4  | Copper       | ppm  | numeric   | 0.0            | 100.0           |
-| b3c8d1e7  | Zinc         | ppm  | numeric   | 0.0            | 200.0           |
-
-This table defines what each analyte actually represents: its standard name, unit of measurement, expected data type, and valid ranges. These are reference data that data stewards can manage without deploying code.
+This isn't a full dimensional model yet; it's staging-area standardization. The gold layer builds actual star schema dimensions (analyte dimensions with units and valid ranges, sample dimensions with tracking metadata, etc.). Silver simply establishes canonical naming and basic categorization.
 
 ![Schema showing mapping tables](unpivot_schema.png)
 
 ### The Silver Transformation
 
-Joining bronze with these mapping tables produces standardized measurements. Here's the SQL pattern:
+Joining bronze with these mapping tables produces standardized column names. Here's the SQL pattern:
 
 ```sql
 CREATE TABLE silver.lab_samples_standardized AS
@@ -258,22 +260,22 @@ SELECT
     b.vendor_id,
     b.file_name,
     b.ingestion_timestamp,
-    -- Standardized analyte information
-    a.analyte_id,
-    a.analyte_name,
-    a.unit,
-    a.data_type,
-    a.min_valid_value,
-    a.max_valid_value
+    -- Standardized column information
+    c.canonical_column_id,
+    c.canonical_column_name,
+    c.column_category,
+    c.data_type
 FROM bronze.lab_samples_unpivoted b
-LEFT JOIN bronze.vendor_analyte_mapping m
+LEFT JOIN bronze.vendor_column_mapping m
     ON b.lab_provided_attribute = m.vendor_column_name
     AND b.vendor_id = m.vendor_id
-LEFT JOIN silver.analyte_dimension a
-    ON m.analyte_id = a.analyte_id;
+LEFT JOIN silver.canonical_column_definitions c
+    ON m.canonical_column_id = c.canonical_column_id;
 ```
 
-The left join pattern is intentional. Not every bronze attribute maps to an analyte; metadata columns like "sample_barcode", "lab_id", and "date_received" won't have analyte mappings. These rows get NULL for analyte_id, which is expected and fine. You can filter for `analyte_id IS NOT NULL` to get just the measurements, or keep everything for complete lineage.
+The left join handles unmapped columns gracefully; anything not in the mapping table gets NULL for canonical information. You can filter for `canonical_column_id IS NOT NULL` to get recognized columns, or keep everything for complete lineage.
+
+This approach treats all columns uniformly. Whether it's "ph" vs "acidity" (measurement) or "sample_barcode" vs "sample_barcod" (identifier), the pattern is the same: map vendor naming to canonical naming through configuration data.
 
 After this transformation, you have:
 - **Original context preserved:** The exact column name vendor used (`lab_provided_attribute`), the vendor_id, file_name, and ingestion_timestamp
@@ -288,15 +290,17 @@ The silver layer demonstrates three architectural principles:
 
 **Separation of concerns:** Bronze handles structure preservation (unpivoting). Silver handles semantic interpretation (mapping). Each layer has a single, clear responsibility.
 
-**Data-driven evolution:** The mapping tables are versioned data that can be managed by data stewards, not just engineers. Domain experts can maintain vendor-to-analyte mappings without understanding the ingestion code.
+**Data-driven evolution:** The mapping tables are versioned data that can be managed by data stewards, not just engineers. Domain experts can maintain vendor-to-column mappings without understanding the ingestion code.
 
-Vendor-specific knowledge still exists; we haven't eliminated the need to understand that "acidity" means pH. But we've moved that knowledge from code (brittle, requires deployments) to data (flexible, requires inserts/updates).
+Vendor-specific knowledge still exists; we haven't eliminated the need to understand that "acidity" means pH or "sample_barcod" means sample_barcode. But we've moved that knowledge from code (brittle, requires deployments) to data (flexible, requires inserts/updates). The complexity didn't vanish; it got a new address and better management.
+
+**A note on dimensional modeling:** This silver layer approach establishes canonical naming but doesn't build full star schema dimensions. That's the gold layer's job. Gold takes canonical columns and builds proper dimension tables (analyte dimensions with units and valid ranges, sample dimensions with tracking metadata, date dimensions, etc.). Silver is a staging area for standardization; gold is where dimensional modeling happens.
 
 ## Rethinking "Raw" Data
 
 The unpivot pattern raises deeper questions about data engineering philosophy. Part 2 ended by questioning whether the complex eight-step bronze layer was still preserving "raw" data. This pattern forces a more careful definition of what "raw" actually means.
 
-When vendors export CSVs, they're likely just dumping data from Excel or their lab information systems without much thought. The wide format (one column per measurement) is convenient for humans viewing spreadsheets, but it encodes domain knowledge into structure. To understand that the third column represents copper measurements, you need to read the header; the column position itself carries no semantic meaning.
+When vendors export CSVs, they're likely just dumping data from Excel or their lab information systems without much thought (though calling anything that survived Excel's date-parsing tendencies "raw" requires some philosophical flexibility). The wide format (one column per measurement) is convenient for humans viewing spreadsheets, but it encodes domain knowledge into structure. To understand that the third column represents copper measurements, you need to read the header; the column position itself carries no semantic meaning.
 
 The unpivot transformation exposes the atomic facts hiding in this structure: this sample, this attribute, this value, at this position. Column names stop being structural constraints and become data values we can query, filter, and join against. Whether a vendor calls it "ph" or misspells it as "pH_lvl", it's just a string value in `lab_provided_attribute`.
 
@@ -306,7 +310,7 @@ In this sense, unpivoted bronze is closer to "raw" than wide bronze. The messine
 
 The unpivot pattern presents a paradox: by giving up control (accepting any schema), we gain control (one ingestion pattern).
 
-Part 2's approach tried to control vendor chaos through transformation logic: detect headers, fix typos, sanitize characters, map column names, align to superset schemas. Each transformation attempted to force vendor data into expected structure, making the system increasingly fragile.
+Part 2's approach tried to control vendor chaos through transformation logic: detect headers, fix typos, sanitize characters, map column names, align to superset schemas. Each transformation attempted to force vendor data into expected structure, making the system increasingly fragile. The harder we fought for control, the more brittle the system became.
 
 In contrast, the unpivot approach accepts vendor chaos by treating it as data to preserve rather than problems to solve. Bronze doesn't validate column names or fix typos; those are silver layer concerns solved through mapping tables. When vendor schemas change, bronze doesn't break. It just creates different `lab_provided_attribute` values, and the mapping tables handle semantic evolution without code changes.
 

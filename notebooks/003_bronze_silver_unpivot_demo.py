@@ -308,24 +308,24 @@ silver_table_name = f"{catalog}.{silver_schema}.lab_samples_standardized"
 spark_df_silver = spark.sql(f"""
 SELECT
     -- Original bronze columns for lineage
-    b.row_index,
-    b.column_index,
-    b.lab_provided_attribute,
-    b.lab_provided_value,
-    b.vendor_id,
-    b.file_name,
-    b.ingestion_timestamp,
+    bronze.row_index,
+    bronze.column_index,
+    bronze.lab_provided_attribute,
+    bronze.lab_provided_value,
+    bronze.vendor_id,
+    bronze.file_name,
+    bronze.ingestion_timestamp,
     -- Standardized column information
-    c.canonical_column_id,
-    c.canonical_column_name,
-    c.column_category,
-    c.data_type
-FROM {bronze_table_name} b
-LEFT JOIN {mapping_table} m
-    ON b.lab_provided_attribute = m.vendor_column_name
-    AND b.vendor_id = m.vendor_id
-LEFT JOIN {canonical_table} c
-    ON m.canonical_column_id = c.canonical_column_id
+    canonical.canonical_column_id,
+    canonical.canonical_column_name,
+    canonical.column_category,
+    canonical.data_type
+FROM {bronze_table_name} AS bronze
+LEFT JOIN {mapping_table} AS mapping
+    ON bronze.lab_provided_attribute = mapping.vendor_column_name
+    AND bronze.vendor_id = mapping.vendor_id
+LEFT JOIN {canonical_table} AS canonical
+    ON mapping.canonical_column_id = canonical.canonical_column_id
 """)
 
 # Write to silver table

@@ -193,20 +193,24 @@ files_to_generate = [
 
 # MAGIC %md
 # MAGIC ## Generate Metadata Tables
+# MAGIC
+# MAGIC Two tables drive silver layer standardization:
+# MAGIC - **canonical_column_definitions**: Defines canonical columns with categories and data types
+# MAGIC - **vendor_column_mapping**: Maps vendor-specific column names to canonical IDs
 
 # COMMAND ----------
 
 print("Generating metadata tables...")
 
-# Generate analyte dimension table
-analyte_dim_path = f"{VOLUME_PATH}/analyte_dimension.csv"
-metadata.generate_analyte_dimension_csv(analyte_dim_path)
-print(f"  ✓ Analyte dimension written to {analyte_dim_path}")
+# Generate canonical column definitions table
+canonical_path = f"{VOLUME_PATH}/canonical_column_definitions.csv"
+metadata.generate_canonical_column_definitions_csv(canonical_path)
+print(f"  ✓ Canonical column definitions written to {canonical_path}")
 
-# Generate vendor-analyte mapping table
-mapping_path = f"{VOLUME_PATH}/vendor_analyte_mapping.csv"
-metadata.generate_vendor_analyte_mapping_csv(mapping_path)
-print(f"  ✓ Vendor-analyte mapping written to {mapping_path}")
+# Generate vendor column mapping table
+mapping_path = f"{VOLUME_PATH}/vendor_column_mapping.csv"
+metadata.generate_vendor_column_mapping_csv(mapping_path)
+print(f"  ✓ Vendor column mapping written to {mapping_path}")
 print()
 
 # COMMAND ----------
@@ -262,23 +266,23 @@ for file_config in files_to_generate:
 
 print("Loading metadata tables to Delta...")
 
-# Load analyte dimension to silver (clean reference data)
-analyte_df = (
+# Load canonical column definitions to silver (reference data for standardization)
+canonical_df = (
     spark.read.option("header", "true")
     .option("inferSchema", "true")
-    .csv(analyte_dim_path)
+    .csv(canonical_path)
 )
-analyte_table_name = f"{catalog}.{silver_schema}.analyte_dimension"
-analyte_df.write.mode("overwrite").saveAsTable(analyte_table_name)
-print(f"  ✓ Analyte dimension saved to {analyte_table_name}")
+canonical_table_name = f"{catalog}.{silver_schema}.canonical_column_definitions"
+canonical_df.write.mode("overwrite").saveAsTable(canonical_table_name)
+print(f"  ✓ Canonical column definitions saved to {canonical_table_name}")
 
-# Load vendor-analyte mapping to bronze (raw mapping data)
+# Load vendor column mapping to bronze (maps vendor columns to canonical IDs)
 mapping_df = (
     spark.read.option("header", "true").option("inferSchema", "true").csv(mapping_path)
 )
-mapping_table_name = f"{catalog}.{bronze_schema}.vendor_analyte_mapping"
+mapping_table_name = f"{catalog}.{bronze_schema}.vendor_column_mapping"
 mapping_df.write.mode("overwrite").saveAsTable(mapping_table_name)
-print(f"  ✓ Vendor-analyte mapping saved to {mapping_table_name}")
+print(f"  ✓ Vendor column mapping saved to {mapping_table_name}")
 print()
 
 # COMMAND ----------
@@ -287,7 +291,7 @@ print()
 # MAGIC ## Summary
 # MAGIC
 # MAGIC Files generated successfully! You should now have:
-# MAGIC - **Metadata tables** (analyte_dimension.csv, vendor_analyte_mapping.csv)
+# MAGIC - **Mapping tables** (canonical_column_definitions.csv, vendor_column_mapping.csv)
 # MAGIC - **Clean files** showing legitimate vendor schema variations
 # MAGIC - **Messy files** with header typos, casing issues, whitespace
 # MAGIC - **Excel nightmares** with metadata rows at the top and empty padding columns

@@ -7,7 +7,7 @@ Main modules:
 - numeric: Generate numeric data with distributions and precision
 - string: Generate barcodes and string identifiers
 - temporal: Generate date/time data with relationships
-- metadata: Generate analyte dimensions and vendor mappings
+- metadata: Generate canonical column definitions and vendor column mappings
 """
 
 # Core vendor data generation
@@ -26,12 +26,11 @@ from .chaos import (
 
 # Metadata generation
 from .metadata import (
-    generate_analyte_dimension_csv,
-    generate_vendor_analyte_mapping_csv,
+    generate_canonical_column_definitions_csv,
+    generate_vendor_column_mapping_csv,
     generate_surrogate_key,
-    ANALYTE_DIMENSION,
-    VENDOR_ANALYTE_MAPPING,
-    VENDOR_COLUMN_TO_ANALYTE,
+    CANONICAL_COLUMN_DEFINITIONS,
+    VENDOR_COLUMN_MAPPING,
 )
 
 # Low-level generators (for custom data generation)
@@ -53,12 +52,11 @@ __all__ = [
     "chaos_metadata_rows",
     "chaos_empty_column_padding",
     # Metadata
-    "generate_analyte_dimension_csv",
-    "generate_vendor_analyte_mapping_csv",
+    "generate_canonical_column_definitions_csv",
+    "generate_vendor_column_mapping_csv",
     "generate_surrogate_key",
-    "ANALYTE_DIMENSION",
-    "VENDOR_ANALYTE_MAPPING",
-    "VENDOR_COLUMN_TO_ANALYTE",
+    "CANONICAL_COLUMN_DEFINITIONS",
+    "VENDOR_COLUMN_MAPPING",
     # Low-level generators
     "forge_distribution",
     "forge_barcode",

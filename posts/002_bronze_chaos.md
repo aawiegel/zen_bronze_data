@@ -24,7 +24,7 @@ sample_barcode,lab_id,date_received,date_processed,acidity,cu_total,zn_total
 
 Same measurements. Different names. Vendor B calls pH "acidity." They use chemical symbols with `_total` suffixes instead of element names with `_ppm` suffixes.
 
-This is not a data quality problem. This is a legitimate difference in how two professional laboratories name their measurements. Both schemas are internally consistent and well-documented. The challenge is ours: we need both vendors' data in the same bronze table.
+This is not a data quality problem. This is a legitimate difference in how two professional laboratories name their measurements. (Although pedantically you might wonder about a chemistry lab that thinks pH and acidity are the same thing.) Both schemas are internally consistent and well-documented. The challenge is ours: we need both vendors' data in the same bronze table.
 
 ### Bronze Layer: Approach 1 (Add Vendor-Specific Column Mapping)
 
@@ -155,7 +155,7 @@ Our superset schema handles varying column sets, but the next issue reveals a di
 sample_barcod,lab_id,date_recieved,date_proccessed,ph,copper_ppm,zinc_ppm
 ```
 
-Three typos: `sample_barcod` (missing 'e'), `date_recieved` (i before e), `date_proccessed` (double c, single s). The vendor's export system occasionally mangles column names.
+Three typos: `sample_barcod` (missing 'e'), `date_recieved` (i before e), `date_proccessed` (double c). The vendor's export system mangles column names. Occasionally.
 
 These files are otherwise valid. The data values are correct. Only the header row has issues. Rejecting these files would delay processing by days while we contact the vendor.
 
@@ -436,7 +436,9 @@ What happens when Vendor C arrives? We add more column mappings to the function,
 
 How do we test this? We need sample files for every vendor, every analysis package, every combination of issues. The test matrix grows exponentially.
 
-Where does it end? We haven't addressed date format differences, unit conversions, vendor-specific codes, or the dozens of other variations we'll encounter as more vendors join the system.
+Where does it end? 
+
+Spoiler alert: It doesn't end. We haven't addressed date format differences, unit conversions, vendor-specific codes, or the dozens of other variations we'll encounter as more vendors join the system.
 
 The bronze layer has gotten away from us.
 

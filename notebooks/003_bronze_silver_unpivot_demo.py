@@ -39,7 +39,13 @@ import os
 import glob
 from datetime import datetime
 from pyspark.sql import functions as F
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType
+from pyspark.sql.types import (
+    StructType,
+    StructField,
+    StringType,
+    IntegerType,
+    TimestampType,
+)
 
 # Add workspace files to path for imports
 workspace_files_path = "/Workspace" + os.path.dirname(os.getcwd())
@@ -287,44 +293,42 @@ display(spark_canonical.limit(10))
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 2: Join Bronze with Mapping and Dimension Tables
+# MAGIC ## Step 2: Join Bronze with Mapping and Canonical Tables
+# MAGIC
+# MAGIC The left join handles unmapped columns gracefully; anything not in the mapping table gets NULL for canonical information. You can filter for `canonical_column_id IS NOT NULL` to get recognized columns, or keep everything for complete lineage.
 
 # COMMAND ----------
 
-# Read bronze table
-spark_df_bronze_read = spark.table(bronze_table_name)
+# Define table references
+mapping_table = f"{catalog}.{bronze_schema}.vendor_column_mapping"
+canonical_table = f"{catalog}.{silver_schema}.canonical_column_definitions"
+silver_table_name = f"{catalog}.{silver_schema}.lab_samples_standardized"
 
-# Join with mapping table to get canonical column IDs
-spark_df_with_mapping = spark_df_bronze_read.join(
-    spark_mapping,
-    (spark_df_bronze_read.lab_provided_attribute == spark_mapping.vendor_column_name)
-    & (spark_df_bronze_read.vendor_id == spark_mapping.vendor_id),
-    "left",
-)
-
-# Join with canonical definitions to get standardized column information
-spark_df_silver = spark_df_with_mapping.join(
-    spark_canonical,
-    spark_df_with_mapping.canonical_column_id == spark_canonical.canonical_column_id,
-    "left",
-).select(
-    # Bronze layer columns (preserved for lineage)
-    spark_df_bronze_read.row_index,
-    spark_df_bronze_read.column_index,
-    spark_df_bronze_read.lab_provided_attribute,
-    spark_df_bronze_read.lab_provided_value,
-    spark_df_bronze_read.vendor_id,
-    spark_df_bronze_read.file_name,
-    spark_df_bronze_read.ingestion_timestamp,
-    # Standardized column information
-    spark_canonical.canonical_column_id,
-    spark_canonical.canonical_column_name,
-    spark_canonical.column_category,
-    spark_canonical.data_type,
-)
+# Create silver DataFrame using SQL
+spark_df_silver = spark.sql(f"""
+SELECT
+    -- Original bronze columns for lineage
+    b.row_index,
+    b.column_index,
+    b.lab_provided_attribute,
+    b.lab_provided_value,
+    b.vendor_id,
+    b.file_name,
+    b.ingestion_timestamp,
+    -- Standardized column information
+    c.canonical_column_id,
+    c.canonical_column_name,
+    c.column_category,
+    c.data_type
+FROM {bronze_table_name} b
+LEFT JOIN {mapping_table} m
+    ON b.lab_provided_attribute = m.vendor_column_name
+    AND b.vendor_id = m.vendor_id
+LEFT JOIN {canonical_table} c
+    ON m.canonical_column_id = c.canonical_column_id
+""")
 
 # Write to silver table
-silver_table_name = f"{catalog}.{silver_schema}.lab_samples_standardized"
 spark_df_silver.write.format("delta").mode("overwrite").saveAsTable(silver_table_name)
 
 print(f"✅ Silver table created: {silver_table_name}")

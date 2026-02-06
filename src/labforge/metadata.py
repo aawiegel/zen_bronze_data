@@ -1,5 +1,16 @@
 """
-Generate metadata tables for analytes and vendor-analyte mappings
+Generate metadata tables for the unified column mapping approach.
+
+This module defines canonical column definitions and vendor-specific mappings
+for standardizing vendor data in the silver layer. The approach handles ALL
+columns uniformly (measurements AND metadata like sample_barcode, lab_id).
+
+Tables:
+    - CANONICAL_COLUMN_DEFINITIONS: Defines canonical columns with categories
+    - VENDOR_COLUMN_MAPPING: Maps vendor column names to canonical IDs
+
+Note: This is staging-area standardization. Gold layer builds actual star
+schema dimensions (analyte dimensions with units/ranges, sample dimensions, etc.)
 """
 
 import hashlib
@@ -17,7 +28,7 @@ def generate_surrogate_key(*values: str) -> str:
         8-character hex hash to use as surrogate key
 
     Example:
-        >>> generate_surrogate_key("ph")
+        >>> generate_surrogate_key("col_ph")
         'a94a8fe5'
         >>> generate_surrogate_key("vendor_a", "ph")
         'f0e7d6c5'
@@ -26,332 +37,339 @@ def generate_surrogate_key(*values: str) -> str:
     return hashlib.sha256(combined.encode()).hexdigest()[:8]
 
 
-# Analyte dimension table - the source of truth for all measurements
-ANALYTE_DIMENSION = [
+# =============================================================================
+# CANONICAL COLUMN DEFINITIONS
+# =============================================================================
+# Staging area for all column types. Gold layer builds full dimensional models.
+
+CANONICAL_COLUMN_DEFINITIONS = [
+    # Measurements (analytes)
     {
-        "analyte_id": generate_surrogate_key("ph"),
-        "analyte_name": "pH",
-        "unit": "",
+        "canonical_column_id": generate_surrogate_key("col_ph"),
+        "canonical_column_name": "ph",
+        "column_category": "measurement",
         "data_type": "numeric",
-        "min_valid_value": 0.0,
-        "max_valid_value": 14.0,
-        "description": "Soil pH level measuring acidity/alkalinity (unitless logarithmic scale)",
+        "description": "Soil pH level",
     },
     {
-        "analyte_id": generate_surrogate_key("copper"),
-        "analyte_name": "Copper",
-        "unit": "ppm",
+        "canonical_column_id": generate_surrogate_key("col_copper"),
+        "canonical_column_name": "copper_ppm",
+        "column_category": "measurement",
         "data_type": "numeric",
-        "min_valid_value": 0.0,
-        "max_valid_value": 100.0,
-        "description": "Total copper content in soil",
+        "description": "Copper concentration in ppm",
     },
     {
-        "analyte_id": generate_surrogate_key("zinc"),
-        "analyte_name": "Zinc",
-        "unit": "ppm",
+        "canonical_column_id": generate_surrogate_key("col_zinc"),
+        "canonical_column_name": "zinc_ppm",
+        "column_category": "measurement",
         "data_type": "numeric",
-        "min_valid_value": 0.0,
-        "max_valid_value": 200.0,
-        "description": "Total zinc content in soil",
+        "description": "Zinc concentration in ppm",
     },
     {
-        "analyte_id": generate_surrogate_key("lead"),
-        "analyte_name": "Lead",
-        "unit": "ppm",
+        "canonical_column_id": generate_surrogate_key("col_lead"),
+        "canonical_column_name": "lead_ppm",
+        "column_category": "measurement",
         "data_type": "numeric",
-        "min_valid_value": 0.0,
-        "max_valid_value": 50.0,
-        "description": "Total lead content in soil",
+        "description": "Lead concentration in ppm",
     },
     {
-        "analyte_id": generate_surrogate_key("iron"),
-        "analyte_name": "Iron",
-        "unit": "ppm",
+        "canonical_column_id": generate_surrogate_key("col_iron"),
+        "canonical_column_name": "iron_ppm",
+        "column_category": "measurement",
         "data_type": "numeric",
-        "min_valid_value": 0.0,
-        "max_valid_value": 1000.0,
-        "description": "Total iron content in soil",
+        "description": "Iron concentration in ppm",
     },
     {
-        "analyte_id": generate_surrogate_key("manganese"),
-        "analyte_name": "Manganese",
-        "unit": "ppm",
+        "canonical_column_id": generate_surrogate_key("col_manganese"),
+        "canonical_column_name": "manganese_ppm",
+        "column_category": "measurement",
         "data_type": "numeric",
-        "min_valid_value": 0.0,
-        "max_valid_value": 500.0,
-        "description": "Total manganese content in soil",
+        "description": "Manganese concentration in ppm",
     },
     {
-        "analyte_id": generate_surrogate_key("boron"),
-        "analyte_name": "Boron",
-        "unit": "ppm",
+        "canonical_column_id": generate_surrogate_key("col_boron"),
+        "canonical_column_name": "boron_ppm",
+        "column_category": "measurement",
         "data_type": "numeric",
-        "min_valid_value": 0.0,
-        "max_valid_value": 10.0,
-        "description": "Total boron content in soil",
+        "description": "Boron concentration in ppm",
     },
     {
-        "analyte_id": generate_surrogate_key("molybdenum"),
-        "analyte_name": "Molybdenum",
-        "unit": "ppm",
+        "canonical_column_id": generate_surrogate_key("col_molybdenum"),
+        "canonical_column_name": "molybdenum_ppm",
+        "column_category": "measurement",
         "data_type": "numeric",
-        "min_valid_value": 0.0,
-        "max_valid_value": 5.0,
-        "description": "Total molybdenum content in soil",
+        "description": "Molybdenum concentration in ppm",
     },
     {
-        "analyte_id": generate_surrogate_key("sulfur"),
-        "analyte_name": "Sulfur",
-        "unit": "ppm",
+        "canonical_column_id": generate_surrogate_key("col_sulfur"),
+        "canonical_column_name": "sulfur_ppm",
+        "column_category": "measurement",
         "data_type": "numeric",
-        "min_valid_value": 0.0,
-        "max_valid_value": 300.0,
-        "description": "Total sulfur content in soil",
+        "description": "Sulfur concentration in ppm",
     },
     {
-        "analyte_id": generate_surrogate_key("organic_matter"),
-        "analyte_name": "Organic Matter",
-        "unit": "percent",
+        "canonical_column_id": generate_surrogate_key("col_organic_matter"),
+        "canonical_column_name": "organic_matter_pct",
+        "column_category": "measurement",
         "data_type": "numeric",
-        "min_valid_value": 0.0,
-        "max_valid_value": 100.0,
-        "description": "Percentage of organic matter in soil sample",
+        "description": "Organic matter percentage",
     },
     {
-        "analyte_id": generate_surrogate_key("electrical_conductivity"),
-        "analyte_name": "Electrical Conductivity",
-        "unit": "mS/cm",
+        "canonical_column_id": generate_surrogate_key("col_ec"),
+        "canonical_column_name": "electrical_conductivity",
+        "column_category": "measurement",
         "data_type": "numeric",
-        "min_valid_value": 0.0,
-        "max_valid_value": 20.0,
-        "description": "Electrical conductivity indicating soil salinity",
+        "description": "Electrical conductivity in mS/cm",
+    },
+    # Sample identifiers
+    {
+        "canonical_column_id": generate_surrogate_key("col_sample_barcode"),
+        "canonical_column_name": "sample_barcode",
+        "column_category": "sample_identifier",
+        "data_type": "string",
+        "description": "Unique sample barcode/ID",
+    },
+    # Lab metadata
+    {
+        "canonical_column_id": generate_surrogate_key("col_lab_id"),
+        "canonical_column_name": "lab_id",
+        "column_category": "lab_metadata",
+        "data_type": "string",
+        "description": "Laboratory identifier",
+    },
+    # Date columns
+    {
+        "canonical_column_id": generate_surrogate_key("col_date_received"),
+        "canonical_column_name": "date_received",
+        "column_category": "date",
+        "data_type": "date",
+        "description": "Sample receipt date",
+    },
+    {
+        "canonical_column_id": generate_surrogate_key("col_date_analyzed"),
+        "canonical_column_name": "date_analyzed",
+        "column_category": "date",
+        "data_type": "date",
+        "description": "Analysis date",
     },
 ]
 
-# Vendor-Analyte mapping (through table)
-VENDOR_ANALYTE_MAPPING = [
-    # Vendor A - Basic package
+
+# =============================================================================
+# VENDOR COLUMN MAPPING
+# =============================================================================
+# Maps ALL vendor columns to canonical definitions (measurements AND metadata)
+
+VENDOR_COLUMN_MAPPING = [
+    # ==========================================================================
+    # Vendor A - Measurements
+    # ==========================================================================
     {
-        "vendor_analyte_mapping_id": generate_surrogate_key("vendor_a", "ph"),
         "vendor_id": "vendor_a",
         "vendor_column_name": "ph",
-        "analyte_id": generate_surrogate_key("ph"),
+        "canonical_column_id": generate_surrogate_key("col_ph"),
         "notes": "Direct pH measurement",
     },
     {
-        "vendor_analyte_mapping_id": generate_surrogate_key("vendor_a", "copper_ppm"),
         "vendor_id": "vendor_a",
         "vendor_column_name": "copper_ppm",
-        "analyte_id": generate_surrogate_key("copper"),
-        "notes": "Copper reported in ppm",
+        "canonical_column_id": generate_surrogate_key("col_copper"),
+        "notes": "Copper in ppm",
     },
     {
-        "vendor_analyte_mapping_id": generate_surrogate_key("vendor_a", "zinc_ppm"),
         "vendor_id": "vendor_a",
         "vendor_column_name": "zinc_ppm",
-        "analyte_id": generate_surrogate_key("zinc"),
-        "notes": "Zinc reported in ppm",
+        "canonical_column_id": generate_surrogate_key("col_zinc"),
+        "notes": "Zinc in ppm",
     },
-    # Vendor A - Metals package
     {
-        "vendor_analyte_mapping_id": generate_surrogate_key("vendor_a", "lead_ppm"),
         "vendor_id": "vendor_a",
         "vendor_column_name": "lead_ppm",
-        "analyte_id": generate_surrogate_key("lead"),
-        "notes": "Lead reported in ppm",
+        "canonical_column_id": generate_surrogate_key("col_lead"),
+        "notes": "Lead in ppm",
     },
     {
-        "vendor_analyte_mapping_id": generate_surrogate_key("vendor_a", "iron_ppm"),
         "vendor_id": "vendor_a",
         "vendor_column_name": "iron_ppm",
-        "analyte_id": generate_surrogate_key("iron"),
-        "notes": "Iron reported in ppm",
+        "canonical_column_id": generate_surrogate_key("col_iron"),
+        "notes": "Iron in ppm",
     },
     {
-        "vendor_analyte_mapping_id": generate_surrogate_key(
-            "vendor_a", "manganese_ppm"
-        ),
         "vendor_id": "vendor_a",
         "vendor_column_name": "manganese_ppm",
-        "analyte_id": generate_surrogate_key("manganese"),
-        "notes": "Manganese reported in ppm",
+        "canonical_column_id": generate_surrogate_key("col_manganese"),
+        "notes": "Manganese in ppm",
     },
-    # Vendor A - Micronutrient package
     {
-        "vendor_analyte_mapping_id": generate_surrogate_key("vendor_a", "boron_ppm"),
         "vendor_id": "vendor_a",
         "vendor_column_name": "boron_ppm",
-        "analyte_id": generate_surrogate_key("boron"),
-        "notes": "Boron reported in ppm",
+        "canonical_column_id": generate_surrogate_key("col_boron"),
+        "notes": "Boron in ppm",
     },
     {
-        "vendor_analyte_mapping_id": generate_surrogate_key(
-            "vendor_a", "molybdenum_ppm"
-        ),
         "vendor_id": "vendor_a",
         "vendor_column_name": "molybdenum_ppm",
-        "analyte_id": generate_surrogate_key("molybdenum"),
-        "notes": "Molybdenum reported in ppm",
+        "canonical_column_id": generate_surrogate_key("col_molybdenum"),
+        "notes": "Molybdenum in ppm",
     },
     {
-        "vendor_analyte_mapping_id": generate_surrogate_key("vendor_a", "sulfur_ppm"),
         "vendor_id": "vendor_a",
         "vendor_column_name": "sulfur_ppm",
-        "analyte_id": generate_surrogate_key("sulfur"),
-        "notes": "Vendor A exclusive - sulfur reported in ppm",
+        "canonical_column_id": generate_surrogate_key("col_sulfur"),
+        "notes": "Sulfur in ppm",
     },
     {
-        "vendor_analyte_mapping_id": generate_surrogate_key(
-            "vendor_a", "organic_matter_pct"
-        ),
         "vendor_id": "vendor_a",
         "vendor_column_name": "organic_matter_pct",
-        "analyte_id": generate_surrogate_key("organic_matter"),
-        "notes": "Organic matter as percentage",
+        "canonical_column_id": generate_surrogate_key("col_organic_matter"),
+        "notes": "Organic matter percentage",
     },
-    # Vendor B - Standard package
+    # Vendor A - Metadata columns
     {
-        "vendor_analyte_mapping_id": generate_surrogate_key("vendor_b", "acidity"),
+        "vendor_id": "vendor_a",
+        "vendor_column_name": "sample_barcode",
+        "canonical_column_id": generate_surrogate_key("col_sample_barcode"),
+        "notes": "Sample identifier",
+    },
+    {
+        "vendor_id": "vendor_a",
+        "vendor_column_name": "lab_id",
+        "canonical_column_id": generate_surrogate_key("col_lab_id"),
+        "notes": "Lab identifier",
+    },
+    {
+        "vendor_id": "vendor_a",
+        "vendor_column_name": "received_date",
+        "canonical_column_id": generate_surrogate_key("col_date_received"),
+        "notes": "Date sample received",
+    },
+    # ==========================================================================
+    # Vendor B - Measurements (different naming conventions)
+    # ==========================================================================
+    {
         "vendor_id": "vendor_b",
         "vendor_column_name": "acidity",
-        "analyte_id": generate_surrogate_key("ph"),
-        "notes": "pH reported as 'acidity' by Vendor B",
+        "canonical_column_id": generate_surrogate_key("col_ph"),
+        "notes": "Vendor B calls pH 'acidity'",
     },
     {
-        "vendor_analyte_mapping_id": generate_surrogate_key("vendor_b", "cu_total"),
         "vendor_id": "vendor_b",
         "vendor_column_name": "cu_total",
-        "analyte_id": generate_surrogate_key("copper"),
-        "notes": "Total copper using chemical symbol notation",
+        "canonical_column_id": generate_surrogate_key("col_copper"),
+        "notes": "Chemical symbol notation",
     },
     {
-        "vendor_analyte_mapping_id": generate_surrogate_key("vendor_b", "zn_total"),
         "vendor_id": "vendor_b",
         "vendor_column_name": "zn_total",
-        "analyte_id": generate_surrogate_key("zinc"),
-        "notes": "Total zinc using chemical symbol notation",
+        "canonical_column_id": generate_surrogate_key("col_zinc"),
+        "notes": "Chemical symbol notation",
     },
-    # Vendor B - Heavy metals package
     {
-        "vendor_analyte_mapping_id": generate_surrogate_key("vendor_b", "pb_total"),
         "vendor_id": "vendor_b",
         "vendor_column_name": "pb_total",
-        "analyte_id": generate_surrogate_key("lead"),
-        "notes": "Total lead using chemical symbol notation",
+        "canonical_column_id": generate_surrogate_key("col_lead"),
+        "notes": "Chemical symbol notation",
     },
     {
-        "vendor_analyte_mapping_id": generate_surrogate_key("vendor_b", "fe_total"),
         "vendor_id": "vendor_b",
         "vendor_column_name": "fe_total",
-        "analyte_id": generate_surrogate_key("iron"),
-        "notes": "Total iron using chemical symbol notation",
+        "canonical_column_id": generate_surrogate_key("col_iron"),
+        "notes": "Chemical symbol notation",
     },
     {
-        "vendor_analyte_mapping_id": generate_surrogate_key("vendor_b", "mn_total"),
         "vendor_id": "vendor_b",
         "vendor_column_name": "mn_total",
-        "analyte_id": generate_surrogate_key("manganese"),
-        "notes": "Total manganese using chemical symbol notation",
+        "canonical_column_id": generate_surrogate_key("col_manganese"),
+        "notes": "Chemical symbol notation",
     },
-    # Vendor B - Trace elements package
     {
-        "vendor_analyte_mapping_id": generate_surrogate_key("vendor_b", "b_total"),
         "vendor_id": "vendor_b",
         "vendor_column_name": "b_total",
-        "analyte_id": generate_surrogate_key("boron"),
-        "notes": "Total boron using chemical symbol notation",
+        "canonical_column_id": generate_surrogate_key("col_boron"),
+        "notes": "Chemical symbol notation",
     },
     {
-        "vendor_analyte_mapping_id": generate_surrogate_key("vendor_b", "mo_total"),
         "vendor_id": "vendor_b",
         "vendor_column_name": "mo_total",
-        "analyte_id": generate_surrogate_key("molybdenum"),
-        "notes": "Total molybdenum using chemical symbol notation",
+        "canonical_column_id": generate_surrogate_key("col_molybdenum"),
+        "notes": "Chemical symbol notation",
     },
     {
-        "vendor_analyte_mapping_id": generate_surrogate_key("vendor_b", "ec_ms_cm"),
         "vendor_id": "vendor_b",
         "vendor_column_name": "ec_ms_cm",
-        "analyte_id": generate_surrogate_key("electrical_conductivity"),
-        "notes": "Vendor B exclusive - electrical conductivity in mS/cm",
+        "canonical_column_id": generate_surrogate_key("col_ec"),
+        "notes": "Electrical conductivity",
     },
     {
-        "vendor_analyte_mapping_id": generate_surrogate_key(
-            "vendor_b", "organic_carbon_pct"
-        ),
         "vendor_id": "vendor_b",
         "vendor_column_name": "organic_carbon_pct",
-        "analyte_id": generate_surrogate_key("organic_matter"),
-        "notes": "Organic carbon as proxy for organic matter (reported as percentage)",
+        "canonical_column_id": generate_surrogate_key("col_organic_matter"),
+        "notes": "Organic carbon as proxy for organic matter",
+    },
+    # Vendor B - Metadata columns (with typo example)
+    {
+        "vendor_id": "vendor_b",
+        "vendor_column_name": "sample_id",
+        "canonical_column_id": generate_surrogate_key("col_sample_barcode"),
+        "notes": "Vendor B uses 'sample_id' instead of 'sample_barcode'",
+    },
+    {
+        "vendor_id": "vendor_b",
+        "vendor_column_name": "sample_barcod",
+        "canonical_column_id": generate_surrogate_key("col_sample_barcode"),
+        "notes": "Typo preserved in bronze, mapped here",
+    },
+    {
+        "vendor_id": "vendor_b",
+        "vendor_column_name": "laboratory",
+        "canonical_column_id": generate_surrogate_key("col_lab_id"),
+        "notes": "Vendor B uses 'laboratory' instead of 'lab_id'",
+    },
+    {
+        "vendor_id": "vendor_b",
+        "vendor_column_name": "analysis_date",
+        "canonical_column_id": generate_surrogate_key("col_date_analyzed"),
+        "notes": "Analysis date",
     },
 ]
 
 
-def generate_analyte_dimension_csv(output_path: str) -> pd.DataFrame:
+def generate_canonical_column_definitions_csv(output_path: str) -> pd.DataFrame:
     """
-    Generate analyte dimension CSV file
+    Generate canonical column definitions CSV file
 
     Args:
         output_path: Path to write the CSV file
 
     Returns:
-        DataFrame with analyte dimension data
+        DataFrame with canonical column definitions
 
     Example:
-        >>> df = generate_analyte_dimension_csv("data/analyte_dimension.csv")
-        >>> print(df.columns)
-        Index(['analyte_id', 'analyte_name', 'unit', 'data_type',
-               'min_valid_value', 'max_valid_value', 'description'], dtype='object')
+        >>> df = generate_canonical_column_definitions_csv("data/canonical.csv")
+        >>> print(df.columns.tolist())
+        ['canonical_column_id', 'canonical_column_name', 'column_category',
+         'data_type', 'description']
     """
-    df = pd.DataFrame(ANALYTE_DIMENSION)
+    df = pd.DataFrame(CANONICAL_COLUMN_DEFINITIONS)
     df.to_csv(output_path, index=False)
     return df
 
 
-def generate_vendor_analyte_mapping_csv(output_path: str) -> pd.DataFrame:
+def generate_vendor_column_mapping_csv(output_path: str) -> pd.DataFrame:
     """
-    Generate vendor-analyte mapping CSV file (through table)
+    Generate vendor column mapping CSV file
 
     Args:
         output_path: Path to write the CSV file
 
     Returns:
-        DataFrame with vendor-analyte mapping data
+        DataFrame with vendor column mapping data
 
     Example:
-        >>> df = generate_vendor_analyte_mapping_csv("data/vendor_analyte_mapping.csv")
-        >>> print(df.columns)
-        Index(['vendor_analyte_mapping_id', 'vendor_id', 'vendor_column_name',
-               'analyte_id', 'notes'], dtype='object')
+        >>> df = generate_vendor_column_mapping_csv("data/mapping.csv")
+        >>> print(df.columns.tolist())
+        ['vendor_id', 'vendor_column_name', 'canonical_column_id', 'notes']
     """
-    df = pd.DataFrame(VENDOR_ANALYTE_MAPPING)
+    df = pd.DataFrame(VENDOR_COLUMN_MAPPING)
     df.to_csv(output_path, index=False)
     return df
-
-
-# Simple dict mapping for quick lookups: (vendor_id, vendor_column_name) -> analyte_name
-VENDOR_COLUMN_TO_ANALYTE = {
-    # Vendor A
-    ("vendor_a", "ph"): "ph",
-    ("vendor_a", "copper_ppm"): "copper",
-    ("vendor_a", "zinc_ppm"): "zinc",
-    ("vendor_a", "lead_ppm"): "lead",
-    ("vendor_a", "iron_ppm"): "iron",
-    ("vendor_a", "manganese_ppm"): "manganese",
-    ("vendor_a", "boron_ppm"): "boron",
-    ("vendor_a", "molybdenum_ppm"): "molybdenum",
-    ("vendor_a", "sulfur_ppm"): "sulfur",
-    ("vendor_a", "organic_matter_pct"): "organic_matter",
-    # Vendor B
-    ("vendor_b", "acidity"): "ph",
-    ("vendor_b", "cu_total"): "copper",
-    ("vendor_b", "zn_total"): "zinc",
-    ("vendor_b", "pb_total"): "lead",
-    ("vendor_b", "fe_total"): "iron",
-    ("vendor_b", "mn_total"): "manganese",
-    ("vendor_b", "b_total"): "boron",
-    ("vendor_b", "mo_total"): "molybdenum",
-    ("vendor_b", "ec_ms_cm"): "electrical_conductivity",
-    ("vendor_b", "organic_carbon_pct"): "organic_matter",
-}

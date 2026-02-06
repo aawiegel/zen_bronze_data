@@ -6,11 +6,11 @@ from src.labforge import metadata
 
 def test_generate_surrogate_key_single_value():
     """Test surrogate key generation with single value"""
-    key = metadata.generate_surrogate_key("ph")
+    key = metadata.generate_surrogate_key("col_ph")
     assert isinstance(key, str)
     assert len(key) == 8
     # Should be deterministic
-    assert metadata.generate_surrogate_key("ph") == key
+    assert metadata.generate_surrogate_key("col_ph") == key
 
 
 def test_generate_surrogate_key_multiple_values():
@@ -26,55 +26,53 @@ def test_generate_surrogate_key_multiple_values():
     assert key1 != key2
 
 
-def test_analyte_dimension_structure():
-    """Test that analyte dimension has correct structure"""
-    assert isinstance(metadata.ANALYTE_DIMENSION, list)
-    assert len(metadata.ANALYTE_DIMENSION) > 0
+def test_canonical_column_definitions_structure():
+    """Test that canonical column definitions has correct structure"""
+    assert isinstance(metadata.CANONICAL_COLUMN_DEFINITIONS, list)
+    assert len(metadata.CANONICAL_COLUMN_DEFINITIONS) > 0
 
-    # Check first analyte has all required fields
-    first_analyte = metadata.ANALYTE_DIMENSION[0]
+    # Check first column has all required fields
+    first_column = metadata.CANONICAL_COLUMN_DEFINITIONS[0]
     required_fields = [
-        "analyte_id",
-        "analyte_name",
-        "unit",
+        "canonical_column_id",
+        "canonical_column_name",
+        "column_category",
         "data_type",
-        "min_valid_value",
-        "max_valid_value",
         "description",
     ]
     for field in required_fields:
-        assert field in first_analyte
+        assert field in first_column
 
 
-def test_vendor_analyte_mapping_structure():
-    """Test that vendor-analyte mapping has correct structure"""
-    assert isinstance(metadata.VENDOR_ANALYTE_MAPPING, list)
-    assert len(metadata.VENDOR_ANALYTE_MAPPING) > 0
+def test_vendor_column_mapping_structure():
+    """Test that vendor column mapping has correct structure"""
+    assert isinstance(metadata.VENDOR_COLUMN_MAPPING, list)
+    assert len(metadata.VENDOR_COLUMN_MAPPING) > 0
 
     # Check first mapping has all required fields
-    first_mapping = metadata.VENDOR_ANALYTE_MAPPING[0]
+    first_mapping = metadata.VENDOR_COLUMN_MAPPING[0]
     required_fields = [
-        "vendor_analyte_mapping_id",
         "vendor_id",
         "vendor_column_name",
-        "analyte_id",
+        "canonical_column_id",
         "notes",
     ]
     for field in required_fields:
         assert field in first_mapping
 
 
-def test_generate_analyte_dimension_csv():
-    """Test generating analyte dimension CSV"""
+def test_generate_canonical_column_definitions_csv():
+    """Test generating canonical column definitions CSV"""
     with tempfile.TemporaryDirectory() as tmpdir:
-        output_path = os.path.join(tmpdir, "analyte_dimension.csv")
-        df = metadata.generate_analyte_dimension_csv(output_path)
+        output_path = os.path.join(tmpdir, "canonical_column_definitions.csv")
+        df = metadata.generate_canonical_column_definitions_csv(output_path)
 
         # Check DataFrame structure
         assert isinstance(df, pd.DataFrame)
-        assert len(df) == len(metadata.ANALYTE_DIMENSION)
-        assert "analyte_id" in df.columns
-        assert "analyte_name" in df.columns
+        assert len(df) == len(metadata.CANONICAL_COLUMN_DEFINITIONS)
+        assert "canonical_column_id" in df.columns
+        assert "canonical_column_name" in df.columns
+        assert "column_category" in df.columns
 
         # Check file was created
         assert os.path.exists(output_path)
@@ -84,19 +82,18 @@ def test_generate_analyte_dimension_csv():
         assert len(df_read) == len(df)
 
 
-def test_generate_vendor_analyte_mapping_csv():
-    """Test generating vendor-analyte mapping CSV"""
+def test_generate_vendor_column_mapping_csv():
+    """Test generating vendor column mapping CSV"""
     with tempfile.TemporaryDirectory() as tmpdir:
-        output_path = os.path.join(tmpdir, "vendor_analyte_mapping.csv")
-        df = metadata.generate_vendor_analyte_mapping_csv(output_path)
+        output_path = os.path.join(tmpdir, "vendor_column_mapping.csv")
+        df = metadata.generate_vendor_column_mapping_csv(output_path)
 
         # Check DataFrame structure
         assert isinstance(df, pd.DataFrame)
-        assert len(df) == len(metadata.VENDOR_ANALYTE_MAPPING)
-        assert "vendor_analyte_mapping_id" in df.columns
+        assert len(df) == len(metadata.VENDOR_COLUMN_MAPPING)
         assert "vendor_id" in df.columns
         assert "vendor_column_name" in df.columns
-        assert "analyte_id" in df.columns
+        assert "canonical_column_id" in df.columns
 
         # Check file was created
         assert os.path.exists(output_path)
@@ -106,57 +103,81 @@ def test_generate_vendor_analyte_mapping_csv():
         assert len(df_read) == len(df)
 
 
-def test_all_vendor_columns_mapped():
-    """Test that all vendor columns have mapping entries"""
-    # This ensures we didn't miss any columns when creating the mapping
-    vendor_a_columns = set()
-    vendor_b_columns = set()
-
-    for mapping in metadata.VENDOR_ANALYTE_MAPPING:
-        if mapping["vendor_id"] == "vendor_a":
-            vendor_a_columns.add(mapping["vendor_column_name"])
-        elif mapping["vendor_id"] == "vendor_b":
-            vendor_b_columns.add(mapping["vendor_column_name"])
-
-    # Vendor A should have 10 measurement columns
-    assert len(vendor_a_columns) == 10
-    # Vendor B should have 10 measurement columns
-    assert len(vendor_b_columns) == 10
+def test_column_categories_present():
+    """Test that we have different column categories"""
+    categories = set(
+        col["column_category"] for col in metadata.CANONICAL_COLUMN_DEFINITIONS
+    )
+    # Should have measurements and metadata categories
+    assert "measurement" in categories
+    assert "sample_identifier" in categories
 
 
-def test_surrogate_key_uniqueness():
-    """Test that all analyte IDs are unique"""
-    analyte_ids = [a["analyte_id"] for a in metadata.ANALYTE_DIMENSION]
-    assert len(analyte_ids) == len(set(analyte_ids))
+def test_both_vendors_mapped():
+    """Test that both vendors have mappings"""
+    vendor_ids = set(m["vendor_id"] for m in metadata.VENDOR_COLUMN_MAPPING)
+    assert "vendor_a" in vendor_ids
+    assert "vendor_b" in vendor_ids
 
 
-def test_mapping_surrogate_key_uniqueness():
-    """Test that all mapping IDs are unique"""
-    mapping_ids = [
-        m["vendor_analyte_mapping_id"] for m in metadata.VENDOR_ANALYTE_MAPPING
+def test_canonical_column_id_uniqueness():
+    """Test that all canonical column IDs are unique"""
+    column_ids = [
+        c["canonical_column_id"] for c in metadata.CANONICAL_COLUMN_DEFINITIONS
     ]
-    assert len(mapping_ids) == len(set(mapping_ids))
+    assert len(column_ids) == len(set(column_ids))
 
 
-def test_vendor_column_to_analyte_dict():
-    """Test the simple dict mapping"""
-    # Test vendor A mapping
-    assert metadata.VENDOR_COLUMN_TO_ANALYTE[("vendor_a", "ph")] == "ph"
-    assert metadata.VENDOR_COLUMN_TO_ANALYTE[("vendor_a", "copper_ppm")] == "copper"
+def test_mapping_references_valid_canonical_ids():
+    """Test that all mappings reference valid canonical column IDs"""
+    valid_ids = set(
+        c["canonical_column_id"] for c in metadata.CANONICAL_COLUMN_DEFINITIONS
+    )
 
-    # Test vendor B mapping (different column names, same analytes)
-    assert metadata.VENDOR_COLUMN_TO_ANALYTE[("vendor_b", "acidity")] == "ph"
-    assert metadata.VENDOR_COLUMN_TO_ANALYTE[("vendor_b", "cu_total")] == "copper"
+    for mapping in metadata.VENDOR_COLUMN_MAPPING:
+        assert mapping["canonical_column_id"] in valid_ids, (
+            f"Mapping for {mapping['vendor_column_name']} references "
+            f"invalid canonical_column_id: {mapping['canonical_column_id']}"
+        )
 
-    # Test that both vendors map to same analyte
+
+def test_typo_mapping_exists():
+    """Test that the typo example (sample_barcod) is mapped"""
+    typo_mappings = [
+        m
+        for m in metadata.VENDOR_COLUMN_MAPPING
+        if m["vendor_column_name"] == "sample_barcod"
+    ]
+    assert len(typo_mappings) == 1
+    # Should map to same canonical ID as correct spelling
+    correct_mappings = [
+        m
+        for m in metadata.VENDOR_COLUMN_MAPPING
+        if m["vendor_column_name"] == "sample_barcode"
+    ]
     assert (
-        metadata.VENDOR_COLUMN_TO_ANALYTE[("vendor_a", "ph")]
-        == metadata.VENDOR_COLUMN_TO_ANALYTE[("vendor_b", "acidity")]
+        typo_mappings[0]["canonical_column_id"]
+        == correct_mappings[0]["canonical_column_id"]
     )
 
 
-def test_vendor_column_to_analyte_completeness():
-    """Test that dict has all mappings from the table"""
-    assert len(metadata.VENDOR_COLUMN_TO_ANALYTE) == len(
-        metadata.VENDOR_ANALYTE_MAPPING
+def test_cross_vendor_analyte_mapping():
+    """Test that same analyte maps correctly across vendors"""
+    # Get pH mappings for both vendors
+    vendor_a_ph = [
+        m
+        for m in metadata.VENDOR_COLUMN_MAPPING
+        if m["vendor_id"] == "vendor_a" and m["vendor_column_name"] == "ph"
+    ]
+    vendor_b_ph = [
+        m
+        for m in metadata.VENDOR_COLUMN_MAPPING
+        if m["vendor_id"] == "vendor_b" and m["vendor_column_name"] == "acidity"
+    ]
+
+    assert len(vendor_a_ph) == 1
+    assert len(vendor_b_ph) == 1
+    # Both should map to the same canonical column
+    assert (
+        vendor_a_ph[0]["canonical_column_id"] == vendor_b_ph[0]["canonical_column_id"]
     )

@@ -1,24 +1,29 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Bronze and Silver Layer Demo: Multi-Vendor Data Integration
+# MAGIC # The Zen of the Bronze Layer: Embracing Schema Chaos
 # MAGIC
-# MAGIC This notebook demonstrates loading vendor CSV files into bronze and silver layers using the unpivot approach.
+# MAGIC This notebook demonstrates the unpivot pattern for vendor data integration. The core insight: treat column names as data, not schema.
 # MAGIC
-# MAGIC ## Process Overview
+# MAGIC ## The Problem
 # MAGIC
-# MAGIC 1. **Bronze Layer**: Parse and unpivot all vendor CSV files into long format
-# MAGIC    - Handles messy headers, metadata rows, empty columns
-# MAGIC    - Preserves original column names and values
-# MAGIC    - Vendor-agnostic schema
+# MAGIC Traditional approaches treat CSV column names as schema constraints. When Vendor A calls pH "ph" and Vendor B calls it "acidity", you write mapping logic. When typos appear, you add fuzzy matching. Each variation becomes a code problem requiring a code solution.
 # MAGIC
-# MAGIC 2. **Silver Layer**: Join with mapping tables to standardize
-# MAGIC    - Maps vendor-specific column names to canonical analytes
-# MAGIC    - Adds analyte metadata (units, data types, valid ranges)
-# MAGIC    - Ready for analysis and visualization
+# MAGIC ## The Solution: Unpivot to Long Format
+# MAGIC
+# MAGIC The unpivot pattern is a variant of the Entity-Attribute-Value (EAV) model. We store key-value pairs with position metadata. Column names become data values we can query, filter, and join against.
+# MAGIC
+# MAGIC **Bronze Layer** (this notebook):
+# MAGIC - Parse and unpivot all vendor CSVs into long format
+# MAGIC - Fixed schema: `row_index`, `column_index`, `lab_provided_attribute`, `lab_provided_value`
+# MAGIC - Vendor-agnostic; same code processes every file
+# MAGIC
+# MAGIC **Silver Layer** (this notebook):
+# MAGIC - Join with mapping tables to standardize column names
+# MAGIC - Configuration over code: vendor differences expressed as data, not if/elif branches
 # MAGIC
 # MAGIC ## Data Sources
 # MAGIC
-# MAGIC This notebook processes 11 vendor CSV files:
+# MAGIC Processing 11 vendor CSV files with varying levels of messiness:
 # MAGIC - **Vendor A** (6 files): basic_clean, full_clean, messy_typos, messy_casing, messy_whitespace, excel_nightmare
 # MAGIC - **Vendor B** (5 files): standard_clean, full_clean, messy_combo, excel_disaster, db_nightmare
 
@@ -110,7 +115,11 @@ print("✅ Helper functions defined")
 # MAGIC ---
 # MAGIC # Bronze Layer: Unpivot All Vendor Files
 # MAGIC
-# MAGIC Parse all 11 vendor CSV files and combine them into a single long-format table.
+# MAGIC The unpivot transformation is where wide format becomes long format. Each cell in the original CSV becomes a row in the output. A 50-row CSV with 20 columns becomes 1,000 records (50 × 20).
+# MAGIC
+# MAGIC Position tracking (`row_index`, `column_index`) preserves the original structure. If an issue appears with a measurement, you can trace it back to the exact cell in the source file.
+# MAGIC
+# MAGIC The same loop processes all 11 vendor files. No vendor-specific branches. No special handling for typos. The parser treats every file identically.
 
 # COMMAND ----------
 
@@ -238,32 +247,42 @@ display(
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC # Silver Layer: Standardize with Mapping Tables
+# MAGIC # Silver Layer: Standardization Through Data
 # MAGIC
-# MAGIC Join bronze data with vendor analyte mapping and analyte dimension tables.
+# MAGIC Bronze preserves chaos; silver brings order. The key insight: standardization happens through data (mapping tables), not code (if/elif logic).
+# MAGIC
+# MAGIC The unpivoted bronze table contains `lab_provided_attribute` values like "ph", "acidity", "copper_ppm", "cu_total". The silver layer resolves these to canonical names through joins with mapping tables.
+# MAGIC
+# MAGIC **Configuration over code:** Vendor differences are expressed as rows in mapping tables, not if/elif branches. Adding a vendor means inserting rows; changing mappings means updating rows. Database operations, not deployments.
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Step 1: Load Mapping and Dimension Tables
+# MAGIC ## Step 1: Load Mapping Tables
+# MAGIC
+# MAGIC Two tables drive the standardization:
+# MAGIC - **vendor_column_mapping**: Maps vendor-specific column names to canonical column IDs
+# MAGIC - **canonical_column_definitions**: Defines canonical columns with categories and data types
+# MAGIC
+# MAGIC This isn't a full dimensional model yet; that's the gold layer's job. Silver establishes canonical naming and basic categorization.
 
 # COMMAND ----------
 
-# Load vendor analyte mapping table
-spark_mapping = spark.table(f"{catalog}.{bronze_schema}.vendor_analyte_mapping")
+# Load vendor column mapping table
+spark_mapping = spark.table(f"{catalog}.{bronze_schema}.vendor_column_mapping")
 
-print(f"📋 Vendor Analyte Mapping table:")
+print(f"📋 Vendor Column Mapping table:")
 print(f"   Rows: {spark_mapping.count():,}")
 display(spark_mapping.limit(10))
 
 # COMMAND ----------
 
-# Load analyte dimension table
-spark_analyte_dim = spark.table(f"{catalog}.{silver_schema}.analyte_dimension")
+# Load canonical column definitions table
+spark_canonical = spark.table(f"{catalog}.{silver_schema}.canonical_column_definitions")
 
-print(f"📋 Analyte Dimension table:")
-print(f"   Rows: {spark_analyte_dim.count():,}")
-display(spark_analyte_dim.limit(10))
+print(f"📋 Canonical Column Definitions table:")
+print(f"   Rows: {spark_canonical.count():,}")
+display(spark_canonical.limit(10))
 
 # COMMAND ----------
 
@@ -275,7 +294,7 @@ display(spark_analyte_dim.limit(10))
 # Read bronze table
 spark_df_bronze_read = spark.table(bronze_table_name)
 
-# Join with mapping table to get analyte IDs
+# Join with mapping table to get canonical column IDs
 spark_df_with_mapping = spark_df_bronze_read.join(
     spark_mapping,
     (spark_df_bronze_read.lab_provided_attribute == spark_mapping.vendor_column_name)
@@ -283,13 +302,13 @@ spark_df_with_mapping = spark_df_bronze_read.join(
     "left",
 )
 
-# Join with analyte dimension to get analyte metadata
+# Join with canonical definitions to get standardized column information
 spark_df_silver = spark_df_with_mapping.join(
-    spark_analyte_dim,
-    spark_df_with_mapping.analyte_id == spark_analyte_dim.analyte_id,
+    spark_canonical,
+    spark_df_with_mapping.canonical_column_id == spark_canonical.canonical_column_id,
     "left",
 ).select(
-    # Bronze layer columns
+    # Bronze layer columns (preserved for lineage)
     spark_df_bronze_read.row_index,
     spark_df_bronze_read.column_index,
     spark_df_bronze_read.lab_provided_attribute,
@@ -297,13 +316,11 @@ spark_df_silver = spark_df_with_mapping.join(
     spark_df_bronze_read.vendor_id,
     spark_df_bronze_read.file_name,
     spark_df_bronze_read.ingestion_timestamp,
-    # Mapped analyte information
-    spark_analyte_dim.analyte_id,
-    spark_analyte_dim.analyte_name,
-    spark_analyte_dim.unit,
-    spark_analyte_dim.data_type,
-    spark_analyte_dim.min_valid_value,
-    spark_analyte_dim.max_valid_value,
+    # Standardized column information
+    spark_canonical.canonical_column_id,
+    spark_canonical.canonical_column_name,
+    spark_canonical.column_category,
+    spark_canonical.data_type,
 )
 
 # Write to silver table
@@ -321,8 +338,8 @@ print(f"📋 Columns: {spark_df_silver.columns}")
 
 # COMMAND ----------
 
-print("🔍 Sample standardized measurements from silver layer:\n")
-display(spark_df_silver.filter(F.col("analyte_name").isNotNull()).limit(20))
+print("🔍 Sample standardized records from silver layer:\n")
+display(spark_df_silver.filter(F.col("canonical_column_name").isNotNull()).limit(20))
 
 # COMMAND ----------
 
@@ -332,10 +349,10 @@ display(
     spark_df_silver.groupBy("vendor_id")
     .agg(
         F.count("*").alias("total_records"),
-        F.sum(F.when(F.col("analyte_id").isNotNull(), 1).otherwise(0)).alias(
+        F.sum(F.when(F.col("canonical_column_id").isNotNull(), 1).otherwise(0)).alias(
             "mapped_records"
         ),
-        F.sum(F.when(F.col("analyte_id").isNull(), 1).otherwise(0)).alias(
+        F.sum(F.when(F.col("canonical_column_id").isNull(), 1).otherwise(0)).alias(
             "unmapped_records"
         ),
     )
@@ -344,10 +361,10 @@ display(
 
 # COMMAND ----------
 
-# Show unmapped attributes (these are typically metadata columns like sample_barcode, lab_id, dates)
-print("🔍 Unmapped attributes (typically metadata columns):\n")
+# Show unmapped attributes (columns not yet in mapping table)
+print("🔍 Unmapped attributes (add to vendor_column_mapping as needed):\n")
 display(
-    spark_df_silver.filter(F.col("analyte_id").isNull())
+    spark_df_silver.filter(F.col("canonical_column_id").isNull())
     .select("vendor_id", "lab_provided_attribute")
     .distinct()
     .orderBy("vendor_id", "lab_provided_attribute")
@@ -355,42 +372,50 @@ display(
 
 # COMMAND ----------
 
-# Show standardized analytes across vendors
-print("📊 Analytes found across vendors:\n")
+# Show standardized columns by category
+print("📊 Canonical columns by category:\n")
 display(
-    spark_df_silver.filter(F.col("analyte_name").isNotNull())
-    .groupBy("analyte_name", "unit")
+    spark_df_silver.filter(F.col("canonical_column_name").isNotNull())
+    .groupBy("canonical_column_name", "column_category")
     .agg(
         F.countDistinct("vendor_id").alias("vendor_count"),
-        F.count("*").alias("measurement_count"),
+        F.count("*").alias("record_count"),
     )
-    .orderBy("analyte_name")
+    .orderBy("column_category", "canonical_column_name")
 )
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ---
-# MAGIC # Summary
+# MAGIC # Summary: The Zen of It
+# MAGIC
+# MAGIC By treating column names as data instead of schema, we eliminated brittleness without eliminating complexity. Vendor chaos still exists, but it's no longer a code problem. Column name variations become rows in mapping tables. Schema evolution becomes data updates, not deployments.
+# MAGIC
+# MAGIC This echoes Kimball's staging area principle: preserve source structure before imposing semantics. The unpivoted bronze IS that source structure, with vendor chaos encoded as data rather than fought through transformations.
 # MAGIC
 # MAGIC ## Tables Created
 # MAGIC
-# MAGIC ✅ **Bronze Layer**: `{bronze_table_name}`
-# MAGIC - Unpivoted long format
-# MAGIC - Preserves original column names and values
-# MAGIC - Vendor-agnostic schema
-# MAGIC - Tracks file metadata and ingestion timestamp
+# MAGIC ✅ **Bronze Layer**: `lab_samples_unpivoted`
+# MAGIC - Fixed schema: `row_index`, `column_index`, `lab_provided_attribute`, `lab_provided_value`
+# MAGIC - Vendor-agnostic; same structure for every vendor
+# MAGIC - Position tracking for full lineage back to source cells
 # MAGIC
-# MAGIC ✅ **Silver Layer**: `{silver_table_name}`
-# MAGIC - Standardized measurements with analyte metadata
+# MAGIC ✅ **Silver Layer**: `lab_samples_standardized`
+# MAGIC - Canonical column names via mapping table joins
 # MAGIC - Cross-vendor comparable
-# MAGIC - Ready for analysis and visualization
+# MAGIC - Ready for gold layer dimensional modeling
+# MAGIC
+# MAGIC ## The Paradoxes
+# MAGIC
+# MAGIC - By giving up control (accepting any schema), we gain control (one ingestion path)
+# MAGIC - By preserving more of what vendors send (typos included), we achieve better standardization (explicit mapping)
+# MAGIC - By doing less transformation in bronze, we enable cleaner layer separation
 # MAGIC
 # MAGIC ## Next Steps
 # MAGIC
-# MAGIC Use the silver table to create dashboard visualizations showing:
-# MAGIC - Cross-vendor analyte comparisons
-# MAGIC - Data quality metrics (mapped vs unmapped attributes)
-# MAGIC - Sample distributions by vendor and analyte type
+# MAGIC - **Gold Layer**: Build proper star schema dimensions from canonical column definitions
+# MAGIC - **Data Quality**: Add validation rules and monitoring for unmapped attributes
+# MAGIC - **Dashboards**: Cross-vendor comparisons, mapping coverage, schema drift tracking
 
 # COMMAND ----------

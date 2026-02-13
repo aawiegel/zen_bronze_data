@@ -3,9 +3,15 @@ name = "zen-bronze-data"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.13"
 dependencies = [
     "databricks-connect>=18.0.0",
+    "dbt-core>=1.11.4",
+    "dbt-databricks>=1.10.9",
     "pytest>=9.0.2",
     "ruff>=0.14.13",
 ]
+
+[tool.uv]
+override-dependencies = ["mashumaro[msgpack]==3.17"]
+

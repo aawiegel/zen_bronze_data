@@ -52,3 +52,5 @@ sources:
             description: "Expected data type (numeric, string, date)"
           - name: description
             description: "Human-readable column description"
+          - name: is_metadata_column
+            description: "True for columns that will be pivoted out into their own fields in the standardized view (sample_barcode, lab_id, date_received, date_analyzed); False for measurement columns"

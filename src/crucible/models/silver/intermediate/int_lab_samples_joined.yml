@@ -1,0 +1,12 @@
+version: 2
+
+models:
+  - name: int_lab_samples_joined
+    description: >
+      Silver layer: staged EAV lab data joined with vendor_column_mapping and
+      canonical_column_definitions. Preserves all rows including unmapped
+      attributes (canonical fields are NULL for those rows), making this view
+      useful for diagnosing vendor typos and missing mappings.
+    columns:
+      - name: vendor_mapping_notes
+        description: "Notes from vendor_column_mapping for this attribute (renamed from notes; e.g., typo annotations, naming convention context)"

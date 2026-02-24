@@ -1,0 +1,20 @@
+version: 2
+
+models:
+  - name: int_lab_samples_standardized
+    description: >
+      Silver layer: measurement rows from int_lab_samples_joined with metadata
+      columns (sample_barcode, lab_id, date_received, date_analyzed) pivoted out
+      and attached to each row. Unmapped measurement rows are preserved with NULL
+      canonical values for QA purposes — filter on canonical_column_name IS NULL
+      to find attributes with no mapping. Date columns are kept as raw strings;
+      type casting happens in the gold layer where vendor-specific formats are handled.
+    columns:
+      - name: sample_barcode
+        description: "Unique sample barcode/ID, pivoted from is_metadata_column = True rows; NULL if no sample identifier was present for this row_index"
+      - name: lab_id
+        description: "Laboratory identifier, pivoted from is_metadata_column = True rows; NULL if not present"
+      - name: date_received
+        description: "Sample receipt date as a raw string, pivoted from is_metadata_column = True rows; NULL if not present"
+      - name: date_analyzed
+        description: "Analysis date as a raw string, pivoted from is_metadata_column = True rows; NULL if not present"

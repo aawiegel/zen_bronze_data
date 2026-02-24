@@ -1,0 +1,11 @@
+version: 2
+
+models:
+  - name: stg_lab_samples_unpivoted
+    description: >
+      Staged lab sample data with some simple cleaning done
+      on the lab provided attributes so we can avoid trivial mappings
+      when we join later in the intermediate layer
+    columns:
+      - name: attribute_standardized
+        description: "lab provided attribute made lower case, space trimmed, and replaced unwanted db characters with underscores"

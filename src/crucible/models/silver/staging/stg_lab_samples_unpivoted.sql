@@ -12,7 +12,7 @@ lab_samples_unpivoted_staged AS (
                 TRANSLATE(
                     lab_samples_unpivoted.lab_provided_attribute,
                     '-$()#./ %@!',
-                    '_'
+                    '___________'
                 )
             )
         ) AS attribute_standardized

@@ -1,0 +1,54 @@
+version: 2
+
+sources:
+  - name: bronze
+    database: workspace
+    schema: "{{ var('bronze_schema', 'bronze') }}"
+    tables:
+      - name: lab_samples_unpivoted
+        description: "Unpivoted vendor CSV data in EAV format"
+        columns:
+          - name: row_index
+            description: "Row position in original CSV file (0-indexed)"
+          - name: column_index
+            description: "Column position in original CSV file (0-indexed)"
+          - name: lab_provided_attribute
+            description: "Original column name as provided by the vendor"
+          - name: lab_provided_value
+            description: "Cell value as a string"
+          - name: vendor_id
+            description: "Vendor identifier (e.g., vendor_a, vendor_b)"
+          - name: file_name
+            description: "Source CSV file name"
+          - name: ingestion_timestamp
+            description: "Timestamp when the file was ingested"
+
+      - name: vendor_column_mapping
+        description: "Maps vendor-specific column names to canonical column IDs"
+        columns:
+          - name: vendor_id
+            description: "Vendor identifier"
+          - name: vendor_column_name
+            description: "Column name as used by this vendor"
+          - name: canonical_column_id
+            description: "Surrogate key linking to canonical_column_definitions"
+          - name: notes
+            description: "Mapping context or rationale"
+
+  - name: silver
+    database: workspace
+    schema: "{{ var('silver_schema', 'silver') }}"
+    tables:
+      - name: canonical_column_definitions
+        description: "Canonical column definitions with categories and data types"
+        columns:
+          - name: canonical_column_id
+            description: "Surrogate key for canonical column"
+          - name: canonical_column_name
+            description: "Standardized column name"
+          - name: column_category
+            description: "Column category (measurement, sample_identifier, lab_metadata, date)"
+          - name: data_type
+            description: "Expected data type (numeric, string, date)"
+          - name: description
+            description: "Human-readable column description"

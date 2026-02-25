@@ -133,6 +133,30 @@ The goal is warmth and shared camaraderie, not cynical superiority. Think "findi
 - Let them emerge naturally; forced whimsy is worse than none at all
 - When in doubt, lean into absurdist/silly rather than cynical/sarcastic
 
+## Calibration: Read the Existing Posts First
+
+Before writing any new post in this series, read at least one existing post — particularly `003_zen_bronze.md` — to calibrate the register. Abstract style guidance is harder to internalize than a working example. The existing posts ARE the gold standard; this document describes them, it doesn't replace them.
+
+## The Base Register (What the 95% Should Feel Like)
+
+"Professional" does not mean "clinical." The 95% that isn't explicitly a joke should still feel like a person with opinions narrating their own experience, not a technical document reciting facts. Compare:
+
+**Too clinical (wrong):**
+> "The LEFT JOIN choice preserves rows that don't match the mapping table by setting canonical_column_name to NULL."
+
+**On-register (right):**
+> "Rows that don't match the mapping table don't disappear. They survive with `canonical_column_name IS NULL`, which is not a failure state. It's a diagnostic signal. The pipeline is saying 'something arrived that I don't recognize' rather than quietly discarding evidence that something unexpected happened."
+
+Both sentences convey the same fact. One sounds like documentation. One sounds like a person who has dealt with this problem and has opinions about it.
+
+The 5% is where warmth becomes explicit wit. The 95% should already be warm, opinionated, and in the author's voice — just without the jokes. If a paragraph sounds like it could appear verbatim in official documentation, it needs more voice.
+
+**Signals that the base register is too clinical:**
+- Sentences that describe what something does without any sense of WHY it matters
+- Explanations that could appear in a README without sounding out of place
+- No sense that the author has actually used this and formed opinions about it
+- Technical facts stated without the authorial "and here's what that means for you"
+
 ## Quick Reference Checklist
 
 Before finalizing any blog post, verify:

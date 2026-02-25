@@ -61,7 +61,7 @@ lab_samples_unpivoted_staged AS (
 SELECT * FROM lab_samples_unpivoted_staged
 ```
 
-The cleaning chain does three things. `TRANSLATE` replaces eleven special characters (`-$()#./ %@!`) with underscores, eliminating punctuation and symbols that would prevent string matching. `TRIM` strips leading and trailing whitespace. `LOWER` normalizes to lowercase so that capitalization differences don't produce false mismatches.
+The cleaning chain does three things. `TRANSLATE` replaces eleven special characters (`-$()#./ %@!`) with underscores. `TRIM` strips leading and trailing whitespace. `LOWER` normalizes to lowercase so that capitalization differences don't produce false mismatches. With their powers combined, these three functions will help us later pivot back to wide format cleanly for specific analytical views.
 
 Applied to realistic vendor data: `"Sample Concentration"` becomes `sample_concentration`. `"-a$lot(of)weird#symbols.why/vendors%why@!"` becomes `a_lot_of_weird_symbols_why_vendors_why`, which is arguably an improvement on the original in more ways than one.
 
@@ -153,7 +153,7 @@ metadata_pivoted AS (
 ),
 
 -- All non-metadata rows, including unmapped ones (is_metadata_column IS NULL).
--- Unmapped rows are preserved for QA — filter on is_metadata_column IS NULL to find problem attributes.
+-- Unmapped rows are preserved for QA; filter on is_metadata_column IS NULL to find problem attributes.
 measurements AS (
     SELECT * EXCEPT (is_metadata_column)
     FROM int_lab_samples_joined
@@ -187,7 +187,7 @@ Two other design decisions in this model are worth making explicit.
 
 The `is_metadata_column IS NULL` inclusion in the measurements CTE reflects the same philosophy as the LEFT JOIN in the previous model: preserve ambiguity rather than discard it. An unmapped row in silver is information. It says "something arrived that we haven't classified yet." Discarding it would make the gap invisible; surfacing it makes the gap findable.
 
-Date columns (`date_received`, `date_analyzed`) remain as raw strings through the silver layer. This is not an oversight. Casting vendor date strings to an actual date type without knowing the vendor's format either fails loudly on unexpected input or silently coerces values into something plausible but wrong. Silent and wrong is the worst possible outcome in a data pipeline. Now that we have the data in a more usable format, we can start validating this with further intermediate models before it ends up in a gold table.
+Date columns (`date_received`, `date_analyzed`) remain as raw strings through these intermediate models. This is not an oversight. Casting vendor date strings to an actual date type without knowing the vendor's format either fails loudly on unexpected input or silently coerces values into something plausible but wrong. Silent and wrong is the worst possible outcome in a data pipeline. Now that we have the data in a more usable format, we can start validating this with further intermediate models before it ends up in a gold table.
 
 ## Writing the Contract Down
 
@@ -256,7 +256,7 @@ Incidentally, I got this wrong the first time. The test told me.
 
 Here is the uncomfortable implication of that fact, and it applies regardless of how the models were written. As I was working through this post, I noticed that the join in `int_lab_samples_standardized` was initially written on `row_index` and `vendor_id` alone, which would produce incorrect metadata associations whenever a vendor sends more than one file, since `row_index` resets to zero at the start of each file. I caught it by thinking carefully about what the columns actually represent. I would not have caught it by looking at the SQL and deciding it seemed reasonable.
 
-That bug would have existed in the code whether the models were written with AI assistance, generated from a prompt and pasted in, or typed out manually by an engineer who had just had a very productive morning. The staging model's unit test demonstrates the alternative: make the claim explicit, make it machine-verifiable, and find out whether the claim is true before production data depends on it.
+That bug would have existed in the code whether the models were written with an agent, generated from a Claude prompt and pasted in, or typed out manually by an engineer who had just had a very productive morning. The staging model's unit test demonstrates the alternative: make the claim explicit, make it machine-verifiable, and find out whether the claim is true before production data depends on it.
 
 The question of how to extend that discipline to the intermediate models, and to the outputs of the entire pipeline against real data, is where Part 5 begins.
 
@@ -268,7 +268,7 @@ The first unit test does not pass. The intermediate models have no tests at all.
 
 How do we know that actual vendor data flowing through this pipeline maps correctly to canonical columns? How do we validate that the mapping table covers the attributes vendors actually send, rather than the attributes we assumed they would send? How do we catch a new analysis package that introduces column names we have never seen, silently producing nulls in silver while everyone downstream wonders why the copper measurements disappeared?
 
-Those questions require validation against real data, at the boundaries where layers hand off to each other, against statistical expectations that reflect what vendors actually send rather than what we hope they send. Building that validation framework is the subject of Part 5.
+Those questions require validation against real data, at the boundaries where layers hand off to each other, against statistical expectations that reflect what vendors actually send rather than what we hope they send. Building that validation framework is the next post.
 
 ---
 
@@ -276,10 +276,10 @@ Those questions require validation against real data, at the boundaries where la
 
 **References:**
 
-\[1\] dbt Labs. (2024). *How we structure our dbt projects*. https://docs.getdbt.com/guides/best-practices/how-we-structure/1-guide-overview
+\[1\] dbt Labs. (2026). *How we structure our dbt projects*. https://docs.getdbt.com/guides/best-practices/how-we-structure/1-guide-overview
 
-\[2\] dbt Labs. (2024). *Staging: Preparing and cleaning source data*. https://docs.getdbt.com/guides/best-practices/how-we-structure/2-staging
+\[2\] dbt Labs. (2026). *Staging: Preparing and cleaning source data*. https://docs.getdbt.com/guides/best-practices/how-we-structure/2-staging
 
 \[3\] Kimball, R., & Ross, M. (2013). *The Data Warehouse Toolkit: The Definitive Guide to Dimensional Modeling* (3rd ed.). Wiley.
 
-\[4\] dbt Labs. (2024). *Unit tests*. https://docs.getdbt.com/docs/build/unit-tests
+\[4\] dbt Labs. (2026). *Unit tests*. https://docs.getdbt.com/docs/build/unit-tests

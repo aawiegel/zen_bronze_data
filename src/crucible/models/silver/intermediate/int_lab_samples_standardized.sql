@@ -40,6 +40,7 @@ standardized AS (
     LEFT JOIN metadata_pivoted
         ON measurements.row_index = metadata_pivoted.row_index
         AND measurements.vendor_id = metadata_pivoted.vendor_id
+        AND measurements.file_name = metadata_pivoted.file_name
 )
 
 SELECT * FROM standardized

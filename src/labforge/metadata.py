@@ -50,6 +50,7 @@ CANONICAL_COLUMN_DEFINITIONS = [
         "column_category": "measurement",
         "data_type": "numeric",
         "description": "Soil pH level",
+        "is_metadata_column": False,
     },
     {
         "canonical_column_id": generate_surrogate_key("col_copper"),
@@ -57,6 +58,7 @@ CANONICAL_COLUMN_DEFINITIONS = [
         "column_category": "measurement",
         "data_type": "numeric",
         "description": "Copper concentration in ppm",
+        "is_metadata_column": False,
     },
     {
         "canonical_column_id": generate_surrogate_key("col_zinc"),
@@ -64,6 +66,7 @@ CANONICAL_COLUMN_DEFINITIONS = [
         "column_category": "measurement",
         "data_type": "numeric",
         "description": "Zinc concentration in ppm",
+        "is_metadata_column": False,
     },
     {
         "canonical_column_id": generate_surrogate_key("col_lead"),
@@ -71,6 +74,7 @@ CANONICAL_COLUMN_DEFINITIONS = [
         "column_category": "measurement",
         "data_type": "numeric",
         "description": "Lead concentration in ppm",
+        "is_metadata_column": False,
     },
     {
         "canonical_column_id": generate_surrogate_key("col_iron"),
@@ -78,6 +82,7 @@ CANONICAL_COLUMN_DEFINITIONS = [
         "column_category": "measurement",
         "data_type": "numeric",
         "description": "Iron concentration in ppm",
+        "is_metadata_column": False,
     },
     {
         "canonical_column_id": generate_surrogate_key("col_manganese"),
@@ -85,6 +90,7 @@ CANONICAL_COLUMN_DEFINITIONS = [
         "column_category": "measurement",
         "data_type": "numeric",
         "description": "Manganese concentration in ppm",
+        "is_metadata_column": False,
     },
     {
         "canonical_column_id": generate_surrogate_key("col_boron"),
@@ -92,6 +98,7 @@ CANONICAL_COLUMN_DEFINITIONS = [
         "column_category": "measurement",
         "data_type": "numeric",
         "description": "Boron concentration in ppm",
+        "is_metadata_column": False,
     },
     {
         "canonical_column_id": generate_surrogate_key("col_molybdenum"),
@@ -99,6 +106,7 @@ CANONICAL_COLUMN_DEFINITIONS = [
         "column_category": "measurement",
         "data_type": "numeric",
         "description": "Molybdenum concentration in ppm",
+        "is_metadata_column": False,
     },
     {
         "canonical_column_id": generate_surrogate_key("col_sulfur"),
@@ -106,6 +114,7 @@ CANONICAL_COLUMN_DEFINITIONS = [
         "column_category": "measurement",
         "data_type": "numeric",
         "description": "Sulfur concentration in ppm",
+        "is_metadata_column": False,
     },
     {
         "canonical_column_id": generate_surrogate_key("col_organic_matter"),
@@ -113,6 +122,7 @@ CANONICAL_COLUMN_DEFINITIONS = [
         "column_category": "measurement",
         "data_type": "numeric",
         "description": "Organic matter percentage",
+        "is_metadata_column": False,
     },
     {
         "canonical_column_id": generate_surrogate_key("col_ec"),
@@ -120,6 +130,7 @@ CANONICAL_COLUMN_DEFINITIONS = [
         "column_category": "measurement",
         "data_type": "numeric",
         "description": "Electrical conductivity in mS/cm",
+        "is_metadata_column": False,
     },
     # Sample identifiers
     {
@@ -128,6 +139,7 @@ CANONICAL_COLUMN_DEFINITIONS = [
         "column_category": "sample_identifier",
         "data_type": "string",
         "description": "Unique sample barcode/ID",
+        "is_metadata_column": True,
     },
     # Lab metadata
     {
@@ -136,6 +148,7 @@ CANONICAL_COLUMN_DEFINITIONS = [
         "column_category": "lab_metadata",
         "data_type": "string",
         "description": "Laboratory identifier",
+        "is_metadata_column": True,
     },
     # Date columns
     {
@@ -144,6 +157,7 @@ CANONICAL_COLUMN_DEFINITIONS = [
         "column_category": "date",
         "data_type": "date",
         "description": "Sample receipt date",
+        "is_metadata_column": True,
     },
     {
         "canonical_column_id": generate_surrogate_key("col_date_analyzed"),
@@ -151,6 +165,7 @@ CANONICAL_COLUMN_DEFINITIONS = [
         "column_category": "date",
         "data_type": "date",
         "description": "Analysis date",
+        "is_metadata_column": True,
     },
 ]
 

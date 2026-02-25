@@ -48,3 +48,23 @@ resources:
               bronze_schema: ${resources.schemas.bronze_schema.name}
               silver_schema: ${resources.schemas.silver_schema.name}
               incoming_volume: ${resources.volumes.incoming.name}
+
+    dbt_silver_transform:
+      name: "dbt Silver Layer Transform"
+      environments:
+        - environment_key: dbt_env
+          spec:
+            environment_version: '4'
+            dependencies:
+              - dbt-databricks>=1.10.0
+      tasks:
+        - task_key: dbt_run
+          environment_key: dbt_env
+          dbt_task:
+            project_directory: src/crucible
+            commands:
+              - "dbt deps"
+              - "dbt run --select silver --vars '{bronze_schema: ${resources.schemas.bronze_schema.name}, silver_schema: ${resources.schemas.silver_schema.name}}'"
+            warehouse_id: 36941a39f097afd3
+            catalog: workspace
+            schema: ${resources.schemas.silver_schema.name}

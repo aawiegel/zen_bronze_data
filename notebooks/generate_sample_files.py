@@ -312,13 +312,34 @@ print()
 
 # COMMAND ----------
 
+print("Loading customer tables to Delta...")
+
+customers_delta_df = (
+    spark.read.option("header", "true")
+    .option("inferSchema", "true")
+    .csv(customers_path)
+)
+customers_table_name = f"{catalog}.{bronze_schema}.customers"
+customers_delta_df.write.mode("overwrite").saveAsTable(customers_table_name)
+print(f"  ✓ Customers saved to {customers_table_name}")
+
+customer_samples_delta_df = (
+    spark.read.option("header", "true")
+    .option("inferSchema", "true")
+    .csv(customer_samples_path)
+)
+customer_samples_table_name = f"{catalog}.{bronze_schema}.customer_samples"
+customer_samples_delta_df.write.mode("overwrite").saveAsTable(customer_samples_table_name)
+print(f"  ✓ Customer samples saved to {customer_samples_table_name}")
+print()
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Generate Masked Customer Files for Comparison
 # MAGIC
 # MAGIC Applies five masking strategies to the synthetic customer data and writes
-# MAGIC the masked versions alongside the originals in the volume. No Delta tables
-# MAGIC are created — these files exist for inspection only, so you can compare
-# MAGIC what each strategy does to real-looking data before deciding what to load.
+# MAGIC the masked versions alongside the originals in the volume.
 # MAGIC
 # MAGIC **Masking config applied:**
 # MAGIC - `customer_id`: hash (same salt on both tables — join integrity preserved)
@@ -379,6 +400,12 @@ print()
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC ## Load Masked Customer Tables to Bronze
+
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ## Load Metadata Tables to Delta
 
 # COMMAND ----------
@@ -415,8 +442,8 @@ print()
 # MAGIC - **Messy files** with header typos, casing issues, whitespace
 # MAGIC - **Excel nightmares** with metadata rows at the top and empty padding columns
 # MAGIC - **Database nightmares** with invalid column name characters (#, %, -)
-# MAGIC - **Customer tables** (customers.csv, customer_samples.csv) for the silver layer join
-# MAGIC - **Masked customer files** (customers_masked.csv, customer_samples_masked.csv) for comparison — not loaded to Delta
+# MAGIC - **Customer tables** (customers.csv, customer_samples.csv) — also loaded to bronze as `customers` and `customer_samples`
+# MAGIC - **Masked customer files** (customers_masked.csv, customer_samples_masked.csv). Specifically not loaded to bronze
 # MAGIC
 # MAGIC These files are ready to be processed by your bronze → silver transformation logic!
 

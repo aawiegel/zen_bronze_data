@@ -8,6 +8,8 @@ A soil lab does not only process measurements. It processes submissions from rea
 
 This post answers those questions by building two tools that address related but distinct problems. The customer generator produces realistic profiles derived deterministically from barcodes that already exist in the pipeline. The masking library addresses a separate situation entirely: when real production data needs to enter a development environment with appropriate controls applied. Both tools are useful. They are not interchangeable.
 
+The code for this post can be found [here](). Feel free to follow along or dig in if you want more details.
+
 ## What the Customer Generator Produces
 
 The names, addresses, and contact details come from numpy's random number generator seeded with a SHA-256 digest of each barcode. The same barcode produces the same customer profile every time, in every environment, without storing anything. Faker would have produced more linguistically convincing output and probably should have been the tool for this job. The fixtures work fine regardless. Realism of content was never the point. Stability of attachment was.

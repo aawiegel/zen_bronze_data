@@ -1,0 +1,53 @@
+version: 2
+
+models:
+  - name: int_lab_samples_with_customers
+    description: >
+      Joins standardized lab measurements to customer submission records via a
+      two-hop LEFT JOIN: lab samples → customer_samples (barcode lookup) →
+      customers (customer profile). All measurement rows are preserved regardless
+      of whether a matching customer record exists. The has_customer_assignment
+      flag surfaces rows where no match was found in customer_samples.
+    columns:
+      - name: has_customer_assignment
+        description: "True if the sample_barcode has a matching row in stg_customer_samples; False otherwise."
+      - name: customer_id
+        description: "Foreign key to stg_customers. NULL if has_customer_assignment is False."
+      - name: crop_type
+        description: "Crop being tested. NULL if has_customer_assignment is False."
+      - name: sample_date
+        description: "Date the sample was submitted. NULL if has_customer_assignment is False."
+      - name: customer_name
+        description: "NULL if the customer_id from customer_samples has no matching row in customers."
+      - name: date_of_birth
+        description: "NULL if the customer_id from customer_samples has no matching row in customers."
+      - name: age
+        description: "NULL if the customer_id from customer_samples has no matching row in customers."
+
+unit_tests:
+  - name: test_int_lab_samples_with_customers_join_logic
+    description: >
+      Validates three cases: (1) fully matched row where barcode exists in both
+      customer_samples and customers, (2) unmatched barcode absent from
+      customer_samples so all customer fields are NULL, and (3) barcode present
+      in customer_samples but its customer_id absent from customers so submission
+      fields are populated but customer profile fields are NULL.
+    model: int_lab_samples_with_customers
+    given:
+      - input: ref('int_lab_samples_standardized')
+        rows:
+          - {row_index: 0, vendor_id: "vendor_a", file_name: "test.csv", ingestion_timestamp: "2026-01-01", sample_barcode: "LAB-001", lab_id: "L001", date_received: "2026-01-01", date_analyzed: "2026-01-02", canonical_column_name: "ph", lab_provided_value: "6.8"}
+          - {row_index: 1, vendor_id: "vendor_a", file_name: "test.csv", ingestion_timestamp: "2026-01-01", sample_barcode: "LAB-002", lab_id: "L002", date_received: "2026-01-01", date_analyzed: "2026-01-02", canonical_column_name: "ph", lab_provided_value: "7.1"}
+          - {row_index: 2, vendor_id: "vendor_a", file_name: "test.csv", ingestion_timestamp: "2026-01-01", sample_barcode: "LAB-003", lab_id: "L003", date_received: "2026-01-01", date_analyzed: "2026-01-02", canonical_column_name: "ph", lab_provided_value: "6.5"}
+      - input: ref('stg_customer_samples')
+        rows:
+          - {sample_barcode: "LAB-001", customer_id: "CUST-000001", crop_type: "Corn", sample_date: "2026-03-01"}
+          - {sample_barcode: "LAB-003", customer_id: "CUST-ORPHAN", crop_type: "Wheat", sample_date: "2026-04-10"}
+      - input: ref('stg_customers')
+        rows:
+          - {customer_id: "CUST-000001", customer_name: "Jane Smith", date_of_birth: "1985-03-15", age: 40, email: "jane@example.com", phone: "(555) 123-4567", street_address: "4210 County Road Rd", city: "Springfield", state: "IL", zip_code: "62701", notes: "Spring planting preparation"}
+    expect:
+      rows:
+        - {sample_barcode: "LAB-001", has_customer_assignment: true,  customer_id: "CUST-000001", crop_type: "Corn",  customer_name: "Jane Smith"}
+        - {sample_barcode: "LAB-002", has_customer_assignment: false, customer_id: null,          crop_type: null,   customer_name: null}
+        - {sample_barcode: "LAB-003", has_customer_assignment: true,  customer_id: "CUST-ORPHAN", crop_type: "Wheat", customer_name: null}

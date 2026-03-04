@@ -1,0 +1,21 @@
+customer_id,customer_name,date_of_birth,age,email,phone,street_address,city,state,zip_code,notes
+CUST-CE8B39,Sandra Hernandez,1975-09-01,51,sandra.hernandez@protonmail.com,(923) 867-3934,4332 Hollow Trl,Oxford,WV,27369,Comparison plot for trial program
+CUST-A80821,Jennifer Smith,1984-05-17,42,jennifer.smith@outlook.com,(721) 669-4811,8874 Grain Mill Hwy,Oakland,IA,77869,Drip irrigation system installed
+CUST-BB594D,Michael Martin,1954-04-24,72,michael.martin@aol.com,(715) 559-4138,646 Old Mill Trl,Arlington,IA,56635,Drip irrigation system installed
+CUST-E15EC2,Mark Jones,1998-12-09,28,mark.jones@aol.com,(577) 988-5664,3160 Fence Post Trl,Monroe,TN,40547,Field recently treated with lime
+CUST-9565EE,Sarah Brown,1971-11-20,55,sarah.brown@yahoo.com,(490) 774-3567,4848 Pasture Dr,Dover,OR,99632,Sample collected pre-irrigation
+CUST-4B2240,Karen Williams,1961-04-11,65,karen.williams@icloud.com,(941) 665-7551,N5024W3295,Greenville,WI,41313,Post-harvest soil assessment
+CUST-3391E5,Sarah Johnson,1957-07-21,69,sarah.johnson@hotmail.com,(378) 766-3992,5631 Valley Hwy,Oxford,MO,18522,Organic certification required
+CUST-5B04C7,Susan Taylor,1996-02-22,30,susan.taylor@outlook.com,(415) 991-5817,S8976W3327,Madison,WI,75682,Post-harvest soil assessment
+CUST-0E5988,Sandra Jones,1958-11-06,68,sandra.jones@yahoo.com,(587) 952-6301,2340 Cornfield Trl,Dover,AZ,55859,Suspected micronutrient deficiency
+CUST-B2DB85,Mark Gonzalez,2000-06-06,26,mark.gonzalez@outlook.com,(750) 813-3564,6878 Orchard Trl,Burlington,OH,63197,New crop rotation beginning
+CUST-5E9787,Jessica Miller,1971-08-01,55,jessica.miller@aol.com,(910) 682-5560,6245 Meadow Dr,Burlington,SC,51272,Cover crop incorporated last month
+CUST-B62913,Nancy Lopez,1953-03-25,73,nancy.lopez@outlook.com,(896) 866-3064,3479 Grain Mill Loop,Franklin,NC,92830,Repeat from same field section
+CUST-0FDB3C,Betty Brown,1975-07-14,51,betty.brown@protonmail.com,(364) 820-3448,3031 Harvest Dr,Princeton,WV,18544,New crop rotation beginning
+CUST-526611,Lisa Hernandez,1988-06-04,38,lisa.hernandez@me.com,(898) 638-2481,1906 Orchard Hwy,Arlington,NY,99207,Suspected micronutrient deficiency
+CUST-651F99,Joseph Martinez,1993-03-19,33,joseph.martinez@att.net,(485) 856-4213,546 Township Pike,Riverside,CO,61784,Spring planting preparation
+CUST-166971,Anthony Garcia,1968-05-25,58,anthony.garcia@comcast.net,(326) 711-5897,9265 Hollow Hwy,Greenville,KY,27557,Spring planting preparation
+CUST-D4316A,Susan Smith,1973-05-16,53,susan.smith@mail.com,(676) 616-3086,3880 River Bend Rd,Clinton,NY,50105,Comparison plot for trial program
+CUST-98F93C,Linda Brown,1980-11-22,46,linda.brown@mail.com,(977) 359-4630,9724 Hollow Rd,Princeton,CT,61124,Field recently treated with lime
+CUST-D823A9,Michael Davis,1998-02-25,28,michael.davis@me.com,(903) 327-4449,4045 Creek Loop,Georgetown,NV,22781,Field recently treated with lime
+CUST-CD4644,Robert Lopez,1959-12-01,67,robert.lopez@aol.com,(748) 367-3603,8161 Township Loop,Franklin,HI,62201,Sample collected pre-irrigation

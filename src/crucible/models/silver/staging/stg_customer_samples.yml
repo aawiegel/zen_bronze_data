@@ -1,0 +1,17 @@
+version: 2
+
+models:
+  - name: stg_customer_samples
+    description: >
+      Staged sample submission records. Renames barcode to sample_barcode for
+      consistency with the lab samples models and casts sample_date to DATE.
+      One row per sample submission; multiple rows may share a customer_id.
+    columns:
+      - name: sample_barcode
+        description: "Sample barcode. Renamed from barcode. Foreign key to lab_samples_unpivoted."
+      - name: customer_id
+        description: "Foreign key to stg_customers."
+      - name: crop_type
+        description: "Crop being tested (e.g., Corn, Soybeans). Commercially sensitive."
+      - name: sample_date
+        description: "Date the sample was submitted, cast to DATE."

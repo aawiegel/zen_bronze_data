@@ -23,6 +23,38 @@ sources:
           - name: ingestion_timestamp
             description: "Timestamp when the file was ingested"
 
+      - name: customer_samples
+        description: "Barcode-to-customer assignment table. One row per sample submission, linking a barcode to a customer with submission-level metadata (crop_type, sample_date)."
+        columns:
+          - name: barcode
+            description: "Sample barcode. Foreign key to lab_samples_unpivoted.sample_barcode."
+          - name: customer_id
+            description: "Foreign key to the customers table."
+          - name: crop_type
+            description: "Crop being tested (e.g., Corn, Soybeans). Commercially sensitive."
+          - name: sample_date
+            description: "Date the sample was submitted. String in YYYY-MM-DD format."
+
+      - name: customers
+        description: "Unique customer profiles. One row per customer. PII fields include name, email, address, date_of_birth."
+        columns:
+          - name: customer_id
+            description: "Primary key. Format: CUST-XXXXXX (uppercase hex suffix)."
+          - name: customer_name
+          - name: date_of_birth
+            description: "String in YYYY-MM-DD format."
+          - name: age
+            description: "Integer age in years."
+          - name: email
+          - name: phone
+          - name: street_address
+          - name: city
+          - name: state
+            description: "Two-letter US state code."
+          - name: zip_code
+            description: "Five-digit string."
+          - name: notes
+
       - name: vendor_column_mapping
         description: "Maps vendor-specific column names to canonical column IDs"
         columns:

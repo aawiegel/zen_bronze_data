@@ -1,0 +1,25 @@
+version: 2
+
+models:
+  - name: stg_customers
+    description: >
+      Staged customer profiles. Casts age to INTEGER and date_of_birth to DATE;
+      all other columns pass through as strings. One row per unique customer.
+    columns:
+      - name: customer_id
+        description: "Primary key. Format: CUST-XXXXXX (uppercase hex suffix)."
+      - name: customer_name
+      - name: date_of_birth
+        description: "Date of birth cast to DATE."
+      - name: age
+        description: "Age in years cast to INTEGER."
+      - name: email
+      - name: phone
+      - name: street_address
+      - name: city
+      - name: state
+        description: "Two-letter US state code."
+      - name: zip_code
+        description: "Five-digit string."
+      - name: notes
+

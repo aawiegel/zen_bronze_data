@@ -13,8 +13,7 @@ lab_samples_unpivoted_staged AS (
                 '-$()#./ %@!',
                 '___________'
                 )
-            )
-        ) AS attribute_standardized
+            ) AS attribute_standardized
     FROM lab_samples_unpivoted
 )
 

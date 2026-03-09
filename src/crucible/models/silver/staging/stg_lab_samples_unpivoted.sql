@@ -8,14 +8,12 @@ lab_samples_unpivoted_staged AS (
     SELECT
         *,
         LOWER(
-            TRIM(
-                TRANSLATE(
-                    lab_samples_unpivoted.lab_provided_attribute,
-                    '-$()#./ %@!',
-                    '___________'
+            TRANSLATE(
+                TRIM(lab_samples_unpivoted.lab_provided_attribute),
+                '-$()#./ %@!',
+                '___________'
                 )
-            )
-        ) AS attribute_standardized
+            ) AS attribute_standardized
     FROM lab_samples_unpivoted
 )
 

@@ -30,7 +30,8 @@ if workspace_files_path not in sys.path:
     sys.path.insert(0, workspace_files_path)
 
 import numpy as np
-from src.labforge import vendors, chaos, metadata
+import pandas as pd
+from src.labforge import vendors, chaos, metadata, customers, masking
 
 # Initialize random generator for reproducibility
 gen = np.random.default_rng(42)
@@ -260,6 +261,151 @@ for file_config in files_to_generate:
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC ## Generate Customer and Sample Assignment Tables
+# MAGIC
+# MAGIC Creates two tables that model the many-to-one relationship between samples and customers:
+# MAGIC - **customers.csv**: One row per unique customer (name, address, contact info, DOB)
+# MAGIC - **customer_samples.csv**: One row per barcode, mapping it to a customer with submission-level fields (crop_type, sample_date)
+# MAGIC
+# MAGIC Barcodes are collected from the clean vendor files; the same generator seed means
+# MAGIC re-running this notebook always produces identical output.
+
+# COMMAND ----------
+
+print("Generating customer and sample assignment tables...")
+
+# Collect barcodes from the two clean vendor files
+vendor_a_clean_df = (
+    spark.read.option("header", "true")
+    .csv(f"{VOLUME_PATH}/vendor_a_basic_clean.csv")
+    .toPandas()
+)
+vendor_b_clean_df = (
+    spark.read.option("header", "true")
+    .csv(f"{VOLUME_PATH}/vendor_b_standard_clean.csv")
+    .toPandas()
+)
+
+all_barcodes = list(
+    pd.concat([vendor_a_clean_df["sample_barcode"], vendor_b_clean_df["sample_barcode"]]).unique()
+)
+print(f"  Collected {len(all_barcodes)} barcodes")
+
+# Fewer customers than samples so multiple samples per customer is the norm
+customer_df = customers.forge_customers(len(all_barcodes) // 5, gen)
+customer_samples_df = customers.forge_customer_sample_assignments(all_barcodes, customer_df, gen)
+
+# Write customers.csv
+customers_path = f"{VOLUME_PATH}/customers.csv"
+spark.createDataFrame(customer_df).coalesce(1).write.mode("overwrite").option(
+    "header", "true"
+).csv(customers_path)
+print(f"  ✓ Customers written to {customers_path} ({len(customer_df)} rows)")
+
+# Write customer_samples.csv
+customer_samples_path = f"{VOLUME_PATH}/customer_samples.csv"
+spark.createDataFrame(customer_samples_df).coalesce(1).write.mode("overwrite").option(
+    "header", "true"
+).csv(customer_samples_path)
+print(f"  ✓ Customer samples written to {customer_samples_path} ({len(customer_samples_df)} rows)")
+print()
+
+# COMMAND ----------
+
+print("Loading customer tables to Delta...")
+
+customers_delta_df = (
+    spark.read.option("header", "true")
+    .option("inferSchema", "true")
+    .csv(customers_path)
+)
+customers_table_name = f"{catalog}.{bronze_schema}.customers"
+customers_delta_df.write.mode("overwrite").saveAsTable(customers_table_name)
+print(f"  ✓ Customers saved to {customers_table_name}")
+
+customer_samples_delta_df = (
+    spark.read.option("header", "true")
+    .option("inferSchema", "true")
+    .csv(customer_samples_path)
+)
+customer_samples_table_name = f"{catalog}.{bronze_schema}.customer_samples"
+customer_samples_delta_df.write.mode("overwrite").saveAsTable(customer_samples_table_name)
+print(f"  ✓ Customer samples saved to {customer_samples_table_name}")
+print()
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Generate Masked Customer Files for Comparison
+# MAGIC
+# MAGIC Applies five masking strategies to the synthetic customer data and writes
+# MAGIC the masked versions alongside the originals in the volume.
+# MAGIC
+# MAGIC **Masking config applied:**
+# MAGIC - `customer_id`: hash (same salt on both tables — join integrity preserved)
+# MAGIC - `customer_name`: impute → "Anonymous"
+# MAGIC - `date_of_birth`, `email`, `phone`, `street_address`, `city`: shuffle (values are real but belong to different customers)
+# MAGIC - `age`: resample (distribution preserved, individual values replaced)
+# MAGIC - `crop_type`: shuffle (commercially sensitive — who grows what is obscured)
+
+# COMMAND ----------
+
+MASK_SALT = "bronze-dev-2026"
+
+customer_mask_config = {
+    "customer_id": "hash",
+    "customer_name": "impute",
+    "date_of_birth": "shuffle",
+    "email": "shuffle",
+    "phone": "shuffle",
+    "street_address": "shuffle",
+    "city": "shuffle",
+    "age": "resample",
+}
+customer_imputers = {"customer_name": lambda n: ["Anonymous"] * n}
+
+masked_customer_df = masking.apply_masking(
+    customer_df,
+    customer_mask_config,
+    generator=gen,
+    imputers=customer_imputers,
+    salt=MASK_SALT,
+)
+
+# customer_id must use the same salt so the FK join still works after masking
+assignment_mask_config = {
+    "customer_id": "hash",
+    "crop_type": "shuffle",
+}
+masked_customer_samples_df = masking.apply_masking(
+    customer_samples_df,
+    assignment_mask_config,
+    generator=gen,
+    salt=MASK_SALT,
+)
+
+masked_customers_path = f"{VOLUME_PATH}/customers_masked.csv"
+spark.createDataFrame(masked_customer_df).coalesce(1).write.mode("overwrite").option(
+    "header", "true"
+).csv(masked_customers_path)
+print(f"  ✓ Masked customers written to {masked_customers_path}")
+
+masked_samples_path = f"{VOLUME_PATH}/customer_samples_masked.csv"
+spark.createDataFrame(masked_customer_samples_df).coalesce(1).write.mode("overwrite").option(
+    "header", "true"
+).csv(masked_samples_path)
+print(f"  ✓ Masked customer samples written to {masked_samples_path}")
+print()
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Load Masked Customer Tables to Bronze
+
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ## Load Metadata Tables to Delta
 
 # COMMAND ----------
@@ -296,6 +442,8 @@ print()
 # MAGIC - **Messy files** with header typos, casing issues, whitespace
 # MAGIC - **Excel nightmares** with metadata rows at the top and empty padding columns
 # MAGIC - **Database nightmares** with invalid column name characters (#, %, -)
+# MAGIC - **Customer tables** (customers.csv, customer_samples.csv) — also loaded to bronze as `customers` and `customer_samples`
+# MAGIC - **Masked customer files** (customers_masked.csv, customer_samples_masked.csv). Specifically not loaded to bronze
 # MAGIC
 # MAGIC These files are ready to be processed by your bronze → silver transformation logic!
 

@@ -18,3 +18,48 @@ models:
         description: "Sample receipt date as a raw string, pivoted from is_metadata_column = True rows; NULL if not present"
       - name: date_analyzed
         description: "Analysis date as a raw string, pivoted from is_metadata_column = True rows; NULL if not present"
+
+unit_tests:
+  - name: test_metadata_pivoted_onto_measurement_rows
+    description: "Metadata EAV rows (sample_barcode, lab_id, date_received, date_analyzed) are pivoted and attached to measurement rows sharing the same row_index"
+    model: int_lab_samples_standardized
+    given:
+      - input: ref('int_lab_samples_joined')
+        rows:
+          - {row_index: 0, vendor_id: "vendor_a", file_name: "test.csv", ingestion_timestamp: "2026-01-01", canonical_column_name: "sample_barcode", lab_provided_value: "PYB-0001",  is_metadata_column: true}
+          - {row_index: 0, vendor_id: "vendor_a", file_name: "test.csv", ingestion_timestamp: "2026-01-01", canonical_column_name: "lab_id",         lab_provided_value: "LAB-001",   is_metadata_column: true}
+          - {row_index: 0, vendor_id: "vendor_a", file_name: "test.csv", ingestion_timestamp: "2026-01-01", canonical_column_name: "date_received",   lab_provided_value: "2026-01-01", is_metadata_column: true}
+          - {row_index: 0, vendor_id: "vendor_a", file_name: "test.csv", ingestion_timestamp: "2026-01-01", canonical_column_name: "date_analyzed",   lab_provided_value: "2026-01-02", is_metadata_column: true}
+          - {row_index: 0, vendor_id: "vendor_a", file_name: "test.csv", ingestion_timestamp: "2026-01-01", canonical_column_name: "ph",              lab_provided_value: "6.8",        is_metadata_column: false}
+    expect:
+      rows:
+        - {canonical_column_name: "ph", lab_provided_value: "6.8", sample_barcode: "PYB-0001", lab_id: "LAB-001", date_received: "2026-01-01", date_analyzed: "2026-01-02"}
+
+  - name: test_unmapped_rows_preserved_alongside_measurements
+    description: "Rows with is_metadata_column IS NULL (no mapping found) pass through with metadata attached — they are QA signals, not dropped rows"
+    model: int_lab_samples_standardized
+    given:
+      - input: ref('int_lab_samples_joined')
+        rows:
+          - {row_index: 0, vendor_id: "vendor_a", file_name: "test.csv", ingestion_timestamp: "2026-01-01", canonical_column_name: "sample_barcode", lab_provided_value: "PYB-0001", is_metadata_column: true}
+          - {row_index: 0, vendor_id: "vendor_a", file_name: "test.csv", ingestion_timestamp: "2026-01-01", canonical_column_name: "ph",              lab_provided_value: "6.8",       is_metadata_column: false}
+          - {row_index: 0, vendor_id: "vendor_a", file_name: "test.csv", ingestion_timestamp: "2026-01-01", canonical_column_name: null,              lab_provided_value: "???",       is_metadata_column: null}
+    expect:
+      rows:
+        - {canonical_column_name: "ph",  lab_provided_value: "6.8", sample_barcode: "PYB-0001"}
+        - {canonical_column_name: null,  lab_provided_value: "???", sample_barcode: "PYB-0001"}
+
+  - name: test_metadata_scoped_to_file_not_just_row_index
+    description: "row_index resets to zero between files; joining on row_index and vendor_id alone would mix metadata across files — the file_name in the join key prevents cross-file contamination"
+    model: int_lab_samples_standardized
+    given:
+      - input: ref('int_lab_samples_joined')
+        rows:
+          - {row_index: 0, vendor_id: "vendor_a", file_name: "file_a.csv", ingestion_timestamp: "2026-01-01", canonical_column_name: "sample_barcode", lab_provided_value: "PYB-001", is_metadata_column: true}
+          - {row_index: 0, vendor_id: "vendor_a", file_name: "file_a.csv", ingestion_timestamp: "2026-01-01", canonical_column_name: "ph",              lab_provided_value: "6.8",     is_metadata_column: false}
+          - {row_index: 0, vendor_id: "vendor_a", file_name: "file_b.csv", ingestion_timestamp: "2026-01-01", canonical_column_name: "sample_barcode", lab_provided_value: "PYB-999", is_metadata_column: true}
+          - {row_index: 0, vendor_id: "vendor_a", file_name: "file_b.csv", ingestion_timestamp: "2026-01-01", canonical_column_name: "ph",              lab_provided_value: "7.2",     is_metadata_column: false}
+    expect:
+      rows:
+        - {file_name: "file_a.csv", canonical_column_name: "ph", lab_provided_value: "6.8", sample_barcode: "PYB-001"}
+        - {file_name: "file_b.csv", canonical_column_name: "ph", lab_provided_value: "7.2", sample_barcode: "PYB-999"}

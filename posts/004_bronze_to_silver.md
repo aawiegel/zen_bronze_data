@@ -191,6 +191,8 @@ Date columns (`date_received`, `date_analyzed`) remain as raw strings through th
 
 ## Writing the Contract Down
 
+![schematic representation of pipeline](./medallion_silver_detail.png)
+
 The three models form a coherent chain. Staging creates a joinable key. The first intermediate model uses that key to enrich with canonical meaning. The second pivots the result into an analytical schema while preserving unmapped rows for QA. From a design standpoint, the transformation logic is complete.
 
 From a validation standpoint, we've asserted that it works without demonstrating it. "Looks correct" is not a testing strategy. It is a feeling, and feelings have a well-documented history of being wrong about SQL.
@@ -276,10 +278,10 @@ Those questions require validation against real data, at the boundaries where la
 
 **References:**
 
-\[1\] dbt Labs. (2026). *How we structure our dbt projects*. https://docs.getdbt.com/guides/best-practices/how-we-structure/1-guide-overview
+\[1\] dbt Labs. (2026). [*How we structure our dbt projects*.](https://docs.getdbt.com/guides/best-practices/how-we-structure/1-guide-overview)
 
-\[2\] dbt Labs. (2026). *Staging: Preparing and cleaning source data*. https://docs.getdbt.com/guides/best-practices/how-we-structure/2-staging
+\[2\] dbt Labs. (2026). [*Staging: Preparing and cleaning source data*.] (https://docs.getdbt.com/guides/best-practices/how-we-structure/2-staging)
 
 \[3\] Kimball, R., & Ross, M. (2013). *The Data Warehouse Toolkit: The Definitive Guide to Dimensional Modeling* (3rd ed.). Wiley.
 
-\[4\] dbt Labs. (2026). *Unit tests*. https://docs.getdbt.com/docs/build/unit-tests
+\[4\] dbt Labs. (2026). [*Unit tests*.](https://docs.getdbt.com/docs/build/unit-tests)

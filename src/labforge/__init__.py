@@ -8,6 +8,8 @@ Main modules:
 - string: Generate barcodes and string identifiers
 - temporal: Generate date/time data with relationships
 - metadata: Generate canonical column definitions and vendor column mappings
+- customers: Generate synthetic customer profiles and sample submission assignments
+- masking: Obfuscate sensitive fields using null, shuffle, impute, resample, or hash strategies
 """
 
 # Core vendor data generation
@@ -38,6 +40,23 @@ from .numeric import forge_distribution
 from .string import forge_barcode, forge_barcodes
 from .temporal import forge_date_pairs
 
+# Customer data generation
+from .customers import (
+    derive_seed_from_barcode,
+    forge_customers,
+    forge_customer_sample_assignments,
+)
+
+# Data masking strategies
+from .masking import (
+    apply_masking,
+    mask_null,
+    mask_shuffle,
+    mask_impute,
+    mask_resample,
+    mask_hash,
+)
+
 __all__ = [
     # Vendor data generation
     "forge_vendor_csv",
@@ -62,4 +81,15 @@ __all__ = [
     "forge_barcode",
     "forge_barcodes",
     "forge_date_pairs",
+    # Customer data generation
+    "derive_seed_from_barcode",
+    "forge_customers",
+    "forge_customer_sample_assignments",
+    # Masking strategies
+    "apply_masking",
+    "mask_null",
+    "mask_shuffle",
+    "mask_impute",
+    "mask_resample",
+    "mask_hash",
 ]

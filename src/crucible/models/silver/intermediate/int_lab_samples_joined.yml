@@ -10,3 +10,57 @@ models:
     columns:
       - name: vendor_mapping_notes
         description: "Notes from vendor_column_mapping for this attribute (renamed from notes; e.g., typo annotations, naming convention context)"
+
+unit_tests:
+  - name: test_mapped_attribute_gets_canonical_columns
+    description: "A known attribute that exists in the mapping table gets canonical_column_name and is_metadata_column populated"
+    model: int_lab_samples_joined
+    given:
+      - input: ref('stg_lab_samples_unpivoted')
+        rows:
+          - {row_index: 0, vendor_id: "vendor_a", file_name: "test.csv", ingestion_timestamp: "2026-01-01", lab_provided_attribute: "sample_barcode", lab_provided_value: "PYB-0001", attribute_standardized: "sample_barcode"}
+      - input: source('bronze', 'vendor_column_mapping')
+        rows:
+          - {vendor_id: "vendor_a", vendor_column_name: "sample_barcode", canonical_column_id: "col-001", notes: null}
+      - input: source('silver', 'canonical_column_definitions')
+        rows:
+          - {canonical_column_id: "col-001", canonical_column_name: "sample_barcode", column_category: "sample_identifier", data_type: "string", description: "Sample barcode", is_metadata_column: true}
+    expect:
+      rows:
+        - {attribute_standardized: "sample_barcode", canonical_column_name: "sample_barcode", is_metadata_column: true}
+
+  - name: test_unmapped_attribute_is_preserved_with_null_canonical_columns
+    description: "An attribute with no mapping survives the LEFT JOIN with NULL canonical columns — a QA signal, not a dropped row"
+    model: int_lab_samples_joined
+    given:
+      - input: ref('stg_lab_samples_unpivoted')
+        rows:
+          - {row_index: 0, vendor_id: "vendor_a", file_name: "test.csv", ingestion_timestamp: "2026-01-01", lab_provided_attribute: "mystery_column", lab_provided_value: "foo", attribute_standardized: "mystery_column"}
+      - input: source('bronze', 'vendor_column_mapping')
+        rows: []
+      - input: source('silver', 'canonical_column_definitions')
+        rows: []
+    expect:
+      rows:
+        - {attribute_standardized: "mystery_column", lab_provided_value: "foo", canonical_column_name: null, is_metadata_column: null}
+
+  - name: test_same_attribute_maps_differently_per_vendor
+    description: "The join condition includes vendor_id so the same attribute name can resolve to different canonical columns for different vendors"
+    model: int_lab_samples_joined
+    given:
+      - input: ref('stg_lab_samples_unpivoted')
+        rows:
+          - {row_index: 0, vendor_id: "vendor_a", file_name: "test.csv", ingestion_timestamp: "2026-01-01", lab_provided_attribute: "ph", lab_provided_value: "6.8", attribute_standardized: "ph"}
+          - {row_index: 0, vendor_id: "vendor_b", file_name: "test.csv", ingestion_timestamp: "2026-01-01", lab_provided_attribute: "ph", lab_provided_value: "6.9", attribute_standardized: "ph"}
+      - input: source('bronze', 'vendor_column_mapping')
+        rows:
+          - {vendor_id: "vendor_a", vendor_column_name: "ph", canonical_column_id: "col-ph-a", notes: null}
+          - {vendor_id: "vendor_b", vendor_column_name: "ph", canonical_column_id: "col-ph-b", notes: "vendor B reports corrected pH"}
+      - input: source('silver', 'canonical_column_definitions')
+        rows:
+          - {canonical_column_id: "col-ph-a", canonical_column_name: "ph", column_category: "measurement", data_type: "numeric", description: "pH", is_metadata_column: false}
+          - {canonical_column_id: "col-ph-b", canonical_column_name: "ph_corrected", column_category: "measurement", data_type: "numeric", description: "pH (corrected)", is_metadata_column: false}
+    expect:
+      rows:
+        - {vendor_id: "vendor_a", attribute_standardized: "ph", canonical_column_name: "ph",           vendor_mapping_notes: null}
+        - {vendor_id: "vendor_b", attribute_standardized: "ph", canonical_column_name: "ph_corrected", vendor_mapping_notes: "vendor B reports corrected pH"}

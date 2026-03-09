@@ -1,0 +1,74 @@
+version: 2
+
+models:
+  - name: mon_duplicate_barcodes
+    description: >
+      Monitoring: sample barcodes that appear more than once across the pipeline.
+      Only barcodes with total_appearances > 1 are emitted — a clean dataset
+      produces zero rows. duplicate_type distinguishes intra-file duplicates
+      (same barcode submitted twice in one file) from cross-file duplicates
+      (same barcode across multiple vendor submissions).
+      Re-ingestion of the same file does not inflate counts because sample_appearances
+      deduplicates on (vendor_id, sample_barcode, file_name, row_index).
+    columns:
+      - name: vendor_id
+        description: "Vendor identifier"
+      - name: sample_barcode
+        description: "The duplicated sample barcode"
+      - name: total_appearances
+        description: "Number of distinct (file_name, row_index) pairs this barcode appears in"
+      - name: distinct_files
+        description: "Number of distinct files containing this barcode"
+      - name: duplicate_type
+        description: "'intra_file' if all appearances are within one file, 'cross_file' if the barcode spans multiple files"
+      - name: first_file
+        description: "Lexicographically earliest file name containing this barcode"
+      - name: last_file
+        description: "Lexicographically latest file name containing this barcode"
+
+unit_tests:
+  - name: test_clean_barcodes_produce_no_output
+    description: "When every barcode appears exactly once, the model returns zero rows"
+    model: mon_duplicate_barcodes
+    given:
+      - input: ref('int_lab_samples_standardized')
+        rows:
+          - {vendor_id: "vendor_a", sample_barcode: "PYB-0001", file_name: "batch_1.csv", row_index: 0, canonical_column_name: "ph",     lab_provided_value: "6.8", ingestion_timestamp: "2026-01-01"}
+          - {vendor_id: "vendor_a", sample_barcode: "PYB-0002", file_name: "batch_1.csv", row_index: 1, canonical_column_name: "ph",     lab_provided_value: "7.1", ingestion_timestamp: "2026-01-01"}
+    expect:
+      rows: []
+
+  - name: test_intra_file_duplicate_detected
+    description: "A barcode appearing at two distinct row_index values in the same file is flagged as duplicate_type='intra_file'"
+    model: mon_duplicate_barcodes
+    given:
+      - input: ref('int_lab_samples_standardized')
+        rows:
+          - {vendor_id: "vendor_a", sample_barcode: "PYB-0001", file_name: "batch_1.csv", row_index: 0, canonical_column_name: "ph",     lab_provided_value: "6.8", ingestion_timestamp: "2026-01-01"}
+          - {vendor_id: "vendor_a", sample_barcode: "PYB-0001", file_name: "batch_1.csv", row_index: 1, canonical_column_name: "ph",     lab_provided_value: "6.9", ingestion_timestamp: "2026-01-01"}
+    expect:
+      rows:
+        - {vendor_id: "vendor_a", sample_barcode: "PYB-0001", total_appearances: 2, distinct_files: 1, duplicate_type: "intra_file"}
+
+  - name: test_cross_file_duplicate_detected
+    description: "A barcode appearing in two different files is flagged as duplicate_type='cross_file'"
+    model: mon_duplicate_barcodes
+    given:
+      - input: ref('int_lab_samples_standardized')
+        rows:
+          - {vendor_id: "vendor_a", sample_barcode: "PYB-0001", file_name: "batch_1.csv", row_index: 0, canonical_column_name: "ph",     lab_provided_value: "6.8", ingestion_timestamp: "2026-01-01"}
+          - {vendor_id: "vendor_a", sample_barcode: "PYB-0001", file_name: "batch_2.csv", row_index: 0, canonical_column_name: "ph",     lab_provided_value: "6.8", ingestion_timestamp: "2026-02-01"}
+    expect:
+      rows:
+        - {vendor_id: "vendor_a", sample_barcode: "PYB-0001", total_appearances: 2, distinct_files: 2, duplicate_type: "cross_file"}
+
+  - name: test_re_ingestion_does_not_create_false_duplicates
+    description: "The same file ingested twice at different timestamps counts as one appearance per (file_name, row_index), not two"
+    model: mon_duplicate_barcodes
+    given:
+      - input: ref('int_lab_samples_standardized')
+        rows:
+          - {vendor_id: "vendor_a", sample_barcode: "PYB-0001", file_name: "batch_1.csv", row_index: 0, canonical_column_name: "ph",     lab_provided_value: "6.8", ingestion_timestamp: "2026-01-01"}
+          - {vendor_id: "vendor_a", sample_barcode: "PYB-0001", file_name: "batch_1.csv", row_index: 0, canonical_column_name: "ph",     lab_provided_value: "6.8", ingestion_timestamp: "2026-02-01"}
+    expect:
+      rows: []

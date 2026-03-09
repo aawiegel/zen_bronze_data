@@ -1,0 +1,50 @@
+version: 2
+
+models:
+  - name: mon_row_counts
+    description: >
+      Monitoring: sample flow tracking per ingestion event. One row per
+      (vendor_id, file_name, ingestion_timestamp). Use total_samples to verify
+      the vendor delivered the expected volume and to detect unexpected drops
+      or spikes over time.
+    columns:
+      - name: vendor_id
+        description: "Vendor identifier"
+      - name: file_name
+        description: "Source file name"
+      - name: ingestion_timestamp
+        description: "Timestamp when this file was loaded into the bronze table"
+      - name: total_rows
+        description: "Total EAV rows in this ingestion (total_samples * distinct_attributes for a complete file)"
+      - name: total_samples
+        description: "Number of distinct row_index values — one per physical sample in the file"
+      - name: distinct_attributes
+        description: "Number of distinct attribute names reported in this file"
+
+unit_tests:
+  - name: test_row_counts_per_ingestion_event
+    description: "Each (vendor_id, file_name, ingestion_timestamp) combination produces one summary row with correct counts"
+    model: mon_row_counts
+    given:
+      - input: source('bronze', 'lab_samples_unpivoted')
+        rows:
+          - {row_index: 0, column_index: 0, vendor_id: "vendor_a", file_name: "batch_1.csv", ingestion_timestamp: "2026-01-01", lab_provided_attribute: "sample_barcode", lab_provided_value: "PYB-0001"}
+          - {row_index: 0, column_index: 1, vendor_id: "vendor_a", file_name: "batch_1.csv", ingestion_timestamp: "2026-01-01", lab_provided_attribute: "ph",             lab_provided_value: "6.8"}
+          - {row_index: 1, column_index: 0, vendor_id: "vendor_a", file_name: "batch_1.csv", ingestion_timestamp: "2026-01-01", lab_provided_attribute: "sample_barcode", lab_provided_value: "PYB-0002"}
+          - {row_index: 1, column_index: 1, vendor_id: "vendor_a", file_name: "batch_1.csv", ingestion_timestamp: "2026-01-01", lab_provided_attribute: "ph",             lab_provided_value: "7.1"}
+    expect:
+      rows:
+        - {vendor_id: "vendor_a", file_name: "batch_1.csv", total_rows: 4, total_samples: 2, distinct_attributes: 2}
+
+  - name: test_two_vendors_tracked_separately
+    description: "Files from different vendors in the same ingestion are counted as separate rows"
+    model: mon_row_counts
+    given:
+      - input: source('bronze', 'lab_samples_unpivoted')
+        rows:
+          - {row_index: 0, column_index: 0, vendor_id: "vendor_a", file_name: "batch_a.csv", ingestion_timestamp: "2026-01-01", lab_provided_attribute: "ph", lab_provided_value: "6.8"}
+          - {row_index: 0, column_index: 0, vendor_id: "vendor_b", file_name: "batch_b.csv", ingestion_timestamp: "2026-01-01", lab_provided_attribute: "ph", lab_provided_value: "7.2"}
+    expect:
+      rows:
+        - {vendor_id: "vendor_a", file_name: "batch_a.csv", total_samples: 1}
+        - {vendor_id: "vendor_b", file_name: "batch_b.csv", total_samples: 1}

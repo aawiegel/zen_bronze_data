@@ -298,6 +298,48 @@ def chaos_empty_column_padding(
     return df
 
 
+def chaos_duplicate_barcodes(
+    generator, df: pd.DataFrame, num_duplicates: int = 1, barcode_col: str = "sample_barcode"
+) -> pd.DataFrame:
+    """
+    Introduce barcode-level duplicates by appending rows with an existing barcode
+    but entirely new measurement values.
+
+    Simulates a technical replicate that was improperly assigned to a barcode already
+    present in the file — the measurements are real but the identifier is wrong.
+    Each non-barcode column is independently sampled from the existing column values,
+    so the duplicate row looks like a plausible sample without copying any real row.
+
+    Args:
+        generator: numpy random generator
+        df: Input DataFrame (must contain barcode_col)
+        num_duplicates: Number of duplicate rows to append (default 1)
+        barcode_col: Name of the barcode column (default "sample_barcode")
+
+    Returns:
+        DataFrame with num_duplicates additional rows appended. Each new row carries
+        an existing barcode alongside independently resampled measurement values.
+        Returns df unchanged if barcode_col is not present.
+    """
+    if barcode_col not in df.columns:
+        return df
+
+    n = len(df)
+    source_indices = generator.choice(n, size=min(num_duplicates, n), replace=False)
+
+    duplicate_rows = []
+    for source_idx in source_indices:
+        new_row = {}
+        for col in df.columns:
+            if col == barcode_col:
+                new_row[col] = df.iloc[source_idx][barcode_col]
+            else:
+                new_row[col] = df[col].iloc[int(generator.integers(n))]
+        duplicate_rows.append(new_row)
+
+    return pd.concat([df, pd.DataFrame(duplicate_rows)], ignore_index=True)
+
+
 def apply_chaos(
     generator,
     df: pd.DataFrame,
@@ -309,6 +351,7 @@ def apply_chaos(
     num_metadata: int = None,
     add_empty_padding: bool = False,
     num_empty: int = None,
+    num_duplicate_barcodes: int = 0,
 ) -> pd.DataFrame:
     """
     Apply chaos transformations to a DataFrame
@@ -324,6 +367,7 @@ def apply_chaos(
         num_metadata: Number of metadata rows to add (if None and add_metadata_rows=True, random 1-4)
         add_empty_padding: If True, add empty columns with "" names
         num_empty: Number of empty columns to add (if None and add_empty_padding=True, random 1-3)
+        num_duplicate_barcodes: Number of barcode-level duplicate rows to append (default 0 = disabled)
 
     Returns:
         DataFrame with chaotic headers, rows, and columns
@@ -354,6 +398,11 @@ def apply_chaos(
     # Add empty column padding (still works with string column names)
     if add_empty_padding:
         df = chaos_empty_column_padding(generator, df, num_columns=num_empty)
+
+    # Duplicate barcodes before metadata rows — metadata_rows converts column names to
+    # integers, which would break the barcode_col lookup
+    if num_duplicate_barcodes > 0:
+        df = chaos_duplicate_barcodes(generator, df, num_duplicates=num_duplicate_barcodes)
 
     # Apply metadata rows LAST (converts column names to integers)
     # This must be last because it changes the DataFrame structure fundamentally

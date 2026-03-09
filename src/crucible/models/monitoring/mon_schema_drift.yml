@@ -1,0 +1,68 @@
+version: 2
+
+models:
+  - name: mon_schema_drift
+    description: >
+      Monitoring: attribute-level schema drift between consecutive ingestions per vendor.
+      Only emits rows where an attribute was added or removed relative to the prior file.
+      Returns zero rows when only one ingestion run exists per vendor (no drift to detect).
+      Stable attributes present in both files produce no output row.
+    columns:
+      - name: vendor_id
+        description: "Vendor identifier"
+      - name: current_file_name
+        description: "File name of the current (newer) ingestion"
+      - name: current_ingestion_timestamp
+        description: "Ingestion timestamp of the current file"
+      - name: current_file_rank
+        description: "Chronological rank of the current file for this vendor (1 = first ever ingestion)"
+      - name: previous_file_name
+        description: "File name of the prior ingestion for this vendor"
+      - name: previous_ingestion_timestamp
+        description: "Ingestion timestamp of the prior file"
+      - name: lab_provided_attribute
+        description: "The attribute that changed (new or removed)"
+      - name: change_type
+        description: "Either 'new' (appeared in current, absent from previous) or 'removed' (absent from current, present in previous)"
+
+unit_tests:
+  - name: test_no_drift_for_single_ingestion
+    description: "A single ingestion per vendor produces zero output rows — there is no prior file to compare against"
+    model: mon_schema_drift
+    given:
+      - input: source('bronze', 'lab_samples_unpivoted')
+        rows:
+          - {row_index: 0, column_index: 0, vendor_id: "vendor_a", file_name: "file_1.csv", ingestion_timestamp: "2026-01-01", lab_provided_attribute: "ph",             lab_provided_value: "6.8"}
+          - {row_index: 0, column_index: 1, vendor_id: "vendor_a", file_name: "file_1.csv", ingestion_timestamp: "2026-01-01", lab_provided_attribute: "sample_barcode", lab_provided_value: "PYB-0001"}
+    expect:
+      rows: []
+
+  - name: test_new_attribute_detected
+    description: "An attribute present in the second ingestion but absent from the first is flagged as change_type='new'"
+    model: mon_schema_drift
+    given:
+      - input: source('bronze', 'lab_samples_unpivoted')
+        rows:
+          - {row_index: 0, column_index: 0, vendor_id: "vendor_a", file_name: "file_1.csv", ingestion_timestamp: "2026-01-01", lab_provided_attribute: "ph",             lab_provided_value: "6.8"}
+          - {row_index: 0, column_index: 1, vendor_id: "vendor_a", file_name: "file_1.csv", ingestion_timestamp: "2026-01-01", lab_provided_attribute: "sample_barcode", lab_provided_value: "PYB-0001"}
+          - {row_index: 0, column_index: 0, vendor_id: "vendor_a", file_name: "file_2.csv", ingestion_timestamp: "2026-02-01", lab_provided_attribute: "ph",             lab_provided_value: "7.0"}
+          - {row_index: 0, column_index: 1, vendor_id: "vendor_a", file_name: "file_2.csv", ingestion_timestamp: "2026-02-01", lab_provided_attribute: "sample_barcode", lab_provided_value: "PYB-0002"}
+          - {row_index: 0, column_index: 2, vendor_id: "vendor_a", file_name: "file_2.csv", ingestion_timestamp: "2026-02-01", lab_provided_attribute: "zn_ppm",         lab_provided_value: "1.2"}
+    expect:
+      rows:
+        - {vendor_id: "vendor_a", lab_provided_attribute: "zn_ppm", change_type: "new"}
+
+  - name: test_removed_attribute_detected
+    description: "An attribute present in the first ingestion but absent from the second is flagged as change_type='removed'"
+    model: mon_schema_drift
+    given:
+      - input: source('bronze', 'lab_samples_unpivoted')
+        rows:
+          - {row_index: 0, column_index: 0, vendor_id: "vendor_a", file_name: "file_1.csv", ingestion_timestamp: "2026-01-01", lab_provided_attribute: "ph",             lab_provided_value: "6.8"}
+          - {row_index: 0, column_index: 1, vendor_id: "vendor_a", file_name: "file_1.csv", ingestion_timestamp: "2026-01-01", lab_provided_attribute: "sample_barcode", lab_provided_value: "PYB-0001"}
+          - {row_index: 0, column_index: 2, vendor_id: "vendor_a", file_name: "file_1.csv", ingestion_timestamp: "2026-01-01", lab_provided_attribute: "cu_ppm",         lab_provided_value: "0.5"}
+          - {row_index: 0, column_index: 0, vendor_id: "vendor_a", file_name: "file_2.csv", ingestion_timestamp: "2026-02-01", lab_provided_attribute: "ph",             lab_provided_value: "7.0"}
+          - {row_index: 0, column_index: 1, vendor_id: "vendor_a", file_name: "file_2.csv", ingestion_timestamp: "2026-02-01", lab_provided_attribute: "sample_barcode", lab_provided_value: "PYB-0002"}
+    expect:
+      rows:
+        - {vendor_id: "vendor_a", lab_provided_attribute: "cu_ppm", change_type: "removed"}

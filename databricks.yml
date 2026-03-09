@@ -65,6 +65,7 @@ resources:
             commands:
               - "dbt deps"
               - "dbt run --select silver --vars '{bronze_schema: ${resources.schemas.bronze_schema.name}, silver_schema: ${resources.schemas.silver_schema.name}}'"
+              - "dbt run --select monitoring --vars '{bronze_schema: ${resources.schemas.bronze_schema.name}, silver_schema: ${resources.schemas.silver_schema.name}}'"
             warehouse_id: 36941a39f097afd3
             catalog: workspace
             schema: ${resources.schemas.silver_schema.name}

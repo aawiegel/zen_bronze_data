@@ -41,3 +41,5 @@ models:
   crucible:
     silver:
       +materialized: table
+    monitoring:
+      +materialized: view

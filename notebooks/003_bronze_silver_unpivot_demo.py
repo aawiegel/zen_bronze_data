@@ -139,6 +139,7 @@ vendor_files = [
     # Vendor A files
     "vendor_a_basic_clean.csv",
     "vendor_a_full_clean.csv",
+    "vendor_a_basic_duplicate_barcodes.csv",
     "vendor_a_basic_messy_typos.csv",
     "vendor_a_full_messy_casing.csv",
     "vendor_a_full_messy_whitespace.csv",

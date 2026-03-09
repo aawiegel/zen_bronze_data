@@ -391,6 +391,61 @@ def test_chaos_invalid_db_chars_preserves_data(np_number_generator):
     assert df_chaos.iloc[:, 0].tolist() == [1, 2, 3]
 
 
+def test_chaos_duplicate_barcodes_adds_correct_number_of_rows(np_number_generator):
+    """Test that num_duplicates additional rows are appended"""
+    df = pd.DataFrame(
+        {
+            "sample_barcode": [f"PYB-{i:04d}" for i in range(10)],
+            "ph": [6.0 + i * 0.1 for i in range(10)],
+            "copper_ppm": [1.0 + i * 0.5 for i in range(10)],
+        }
+    )
+
+    df_chaos = chaos.chaos_duplicate_barcodes(np_number_generator, df, num_duplicates=3)
+
+    assert len(df_chaos) == 13
+
+
+def test_chaos_duplicate_barcodes_new_rows_have_existing_barcodes(np_number_generator):
+    """Test that appended rows carry barcodes that already exist in the original DataFrame"""
+    df = pd.DataFrame(
+        {
+            "sample_barcode": [f"PYB-{i:04d}" for i in range(10)],
+            "ph": [6.0 + i * 0.1 for i in range(10)],
+            "copper_ppm": [1.0 + i * 0.5 for i in range(10)],
+        }
+    )
+    original_barcodes = set(df["sample_barcode"])
+
+    df_chaos = chaos.chaos_duplicate_barcodes(np_number_generator, df, num_duplicates=2)
+
+    new_rows = df_chaos.iloc[10:]
+    for barcode in new_rows["sample_barcode"]:
+        assert barcode in original_barcodes
+
+
+def test_chaos_duplicate_barcodes_via_apply_chaos(np_number_generator):
+    """Test that num_duplicate_barcodes parameter in apply_chaos appends the correct number of rows"""
+    df = pd.DataFrame(
+        {
+            "sample_barcode": [f"PYB-{i:04d}" for i in range(10)],
+            "ph": [6.0 + i * 0.1 for i in range(10)],
+            "copper_ppm": [1.0 + i * 0.5 for i in range(10)],
+        }
+    )
+
+    df_chaos = chaos.apply_chaos(
+        np_number_generator,
+        df,
+        header_typos=0.0,
+        header_casing=0.0,
+        header_whitespace=0.0,
+        num_duplicate_barcodes=2,
+    )
+
+    assert len(df_chaos) == len(df) + 2
+
+
 def test_apply_chaos_with_invalid_db_chars(np_number_generator):
     """Test that apply_chaos can add invalid database characters"""
     df = pd.DataFrame(

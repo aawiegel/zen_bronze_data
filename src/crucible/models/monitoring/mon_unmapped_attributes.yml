@@ -1,0 +1,51 @@
+version: 2
+
+models:
+  - name: mon_unmapped_attributes
+    description: >
+      Monitoring: vendor attributes that failed to resolve to a canonical column.
+      Sourced from int_lab_samples_joined filtered to canonical_column_id IS NULL.
+      Primary dashboard surface for identifying gaps in vendor_column_mapping.
+      Both the raw vendor name and the standardized form are preserved so the
+      dashboard shows exactly what the mapping table needs to be updated with.
+    columns:
+      - name: vendor_id
+        description: "Vendor identifier"
+      - name: lab_provided_attribute
+        description: "Raw attribute name as the vendor provided it"
+      - name: attribute_standardized
+        description: "Standardized attribute name that the mapping join attempted to match on"
+      - name: occurrence_count
+        description: "Total number of EAV rows with this unmapped attribute"
+      - name: distinct_files
+        description: "Number of distinct source files containing this unmapped attribute"
+      - name: first_seen
+        description: "Earliest ingestion_timestamp for this unmapped attribute"
+      - name: last_seen
+        description: "Most recent ingestion_timestamp for this unmapped attribute"
+
+unit_tests:
+  - name: test_unmapped_attributes_aggregated
+    description: "Rows with canonical_column_id IS NULL are counted and grouped correctly, including distinct file tracking"
+    model: mon_unmapped_attributes
+    given:
+      - input: ref('int_lab_samples_joined')
+        rows:
+          - {vendor_id: "vendor_a", lab_provided_attribute: "Mystery Column", attribute_standardized: "mystery_column", canonical_column_id: null, file_name: "file_1.csv", ingestion_timestamp: "2026-01-01"}
+          - {vendor_id: "vendor_a", lab_provided_attribute: "Mystery Column", attribute_standardized: "mystery_column", canonical_column_id: null, file_name: "file_1.csv", ingestion_timestamp: "2026-01-01"}
+          - {vendor_id: "vendor_a", lab_provided_attribute: "Mystery Column", attribute_standardized: "mystery_column", canonical_column_id: null, file_name: "file_2.csv", ingestion_timestamp: "2026-02-01"}
+    expect:
+      rows:
+        - {vendor_id: "vendor_a", lab_provided_attribute: "Mystery Column", attribute_standardized: "mystery_column", occurrence_count: 3, distinct_files: 2}
+
+  - name: test_mapped_attributes_excluded
+    description: "Rows with a populated canonical_column_id do not appear in the output — only unmapped rows are surfaced"
+    model: mon_unmapped_attributes
+    given:
+      - input: ref('int_lab_samples_joined')
+        rows:
+          - {vendor_id: "vendor_a", lab_provided_attribute: "ph",             attribute_standardized: "ph",             canonical_column_id: "col-ph",   file_name: "file_1.csv", ingestion_timestamp: "2026-01-01"}
+          - {vendor_id: "vendor_a", lab_provided_attribute: "Mystery Column", attribute_standardized: "mystery_column", canonical_column_id: null,        file_name: "file_1.csv", ingestion_timestamp: "2026-01-01"}
+    expect:
+      rows:
+        - {vendor_id: "vendor_a", lab_provided_attribute: "Mystery Column", attribute_standardized: "mystery_column", occurrence_count: 1}

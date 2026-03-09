@@ -131,6 +131,19 @@ files_to_generate = [
             "num_empty": 3,
         },
     },
+    {
+        "filename": "vendor_a_basic_duplicate_barcodes.csv",
+        "vendor": "vendor_a",
+        "packages": ["basic"],
+        "rows": 50,
+        "add_chaos": True,
+        "chaos_config": {
+            "header_typos": 0.0,
+            "header_casing": 0.0,
+            "header_whitespace": 0.0,
+            "num_duplicate_barcodes": 3,
+        },
+    },
     # Vendor B - Clean files
     {
         "filename": "vendor_b_standard_clean.csv",
@@ -442,6 +455,7 @@ print()
 # MAGIC - **Messy files** with header typos, casing issues, whitespace
 # MAGIC - **Excel nightmares** with metadata rows at the top and empty padding columns
 # MAGIC - **Database nightmares** with invalid column name characters (#, %, -)
+# MAGIC - **Duplicate barcode file** (vendor_a_basic_duplicate_barcodes.csv) — clean headers, 3 barcodes appear twice with different measurements (simulates technical replicates improperly assigned to existing barcodes)
 # MAGIC - **Customer tables** (customers.csv, customer_samples.csv) — also loaded to bronze as `customers` and `customer_samples`
 # MAGIC - **Masked customer files** (customers_masked.csv, customer_samples_masked.csv). Specifically not loaded to bronze
 # MAGIC

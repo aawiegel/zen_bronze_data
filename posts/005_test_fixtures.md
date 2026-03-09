@@ -1,6 +1,6 @@
-# Synthetic Data and the Privacy Problem: Building a Customer Pipeline Without Production Records
+# Synthetic Data and the Privacy Problem: Beyond Alice and Bob
 
-The fixtures in this series have always been honest about what they were optimizing for. Posts 1 through 3 generated vendor CSV files designed to capture structural chaos: typos in column headers, shifting measurement packages, metadata rows that Spark reads with misplaced confidence. The goal was a bronze layer that could absorb whatever shape a vendor file arrived in without requiring code changes. The fixture data itself, a collection of pH readings and copper concentrations, was never the point. Nobody's privacy interests are implicated by a synthetic soil sample.
+The fixtures in this series have always been honest about what they were optimizing for. Posts 1 through 3 generated vendor CSV files designed to capture structural chaos: typos in column headers, shifting measurement packages, metadata rows that Spark reads with misplaced confidence, using the same tools we'll develop further here. The goal was a bronze layer that could absorb whatever shape a vendor file arrived in without requiring code changes. The fixture data itself, a collection of pH readings and copper concentrations, was never the point. Nobody's privacy interests are implicated by a synthetic soil sample.
 
 Customer records are a different matter entirely.
 
@@ -8,7 +8,7 @@ A soil lab does not only process measurements. It processes submissions from rea
 
 This post answers those questions by building two tools that address related but distinct problems. The customer generator produces realistic profiles derived deterministically from barcodes that already exist in the pipeline. The masking library addresses a separate situation entirely: when real production data needs to enter a development environment with appropriate controls applied. Both tools are useful. They are not interchangeable.
 
-The code for this post can be found [here](). Feel free to follow along or dig in if you want more details.
+The code for this post can be found [here](https://github.com/aawiegel/zen_bronze_data). Feel free to follow along or dig in if you want more details.
 
 ## What the Customer Generator Produces
 
@@ -185,4 +185,4 @@ The fixture infrastructure this post builds serves a specific purpose: giving th
 
 ---
 
-**Complete working example:** The labforge customer and masking modules are in [src/labforge/](../src/labforge/). The dbt models are in [src/crucible/models/silver/](../src/crucible/models/silver/). Example data comparing raw and masked output is in [example_data/](../example_data/).
+**Complete working example:** The labforge customer and masking modules are in [src/labforge/](https://github.com/aawiegel/zen_bronze_data/tree/main/src/labforge). The dbt models are in [src/crucible/models/silver/](https://github.com/aawiegel/zen_bronze_data/tree/main/src/crucible/models/silver). Example data comparing raw and masked output is in [example_data/](https://github.com/aawiegel/zen_bronze_data/tree/main/example_data/).
